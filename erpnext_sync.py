@@ -1,4 +1,3 @@
-
 import local_config as config
 import requests
 import datetime
@@ -59,6 +58,29 @@ def main():
                         if file_contents:
                             device_attendance_logs = list(map(lambda x: _apply_function_to_key(x, 'timestamp', datetime.datetime.fromtimestamp), json.loads(file_contents)))
                 try:
+                    # Get the shift type for this device
+                    shift_type_name = None
+                    if hasattr(config, 'shift_type_device_mapping'):
+                        for mapping in config.shift_type_device_mapping:
+                            if device['device_id'] in mapping['related_device_id']:
+                                # If shift_type_name is a list, take the first one (or handle as needed)
+                                shift_type_name = mapping['shift_type_name']
+                                if isinstance(shift_type_name, list):
+                                    shift_type_name = shift_type_name[0]
+                                break
+
+                    if shift_type_name:
+                        last_sync_of_checkin = get_last_sync_of_checkin(shift_type_name)
+                        if last_sync_of_checkin and device_attendance_logs:
+                            # Ensure all timestamps are datetime objects
+                            for log in device_attendance_logs:
+                                if isinstance(log['timestamp'], str):
+                                    log['timestamp'] = datetime.datetime.fromisoformat(log['timestamp'])
+                            device_attendance_logs = [
+                                log for log in device_attendance_logs
+                                if log['timestamp'] > last_sync_of_checkin
+                            ]
+
                     pull_process_and_push_data(device, device_attendance_logs)
                     status.set(f'{device["device_id"]}_push_timestamp', str(datetime.datetime.now()))
                     if os.path.exists(dump_file):
@@ -72,7 +94,6 @@ def main():
             info_logger.info("Mission Accomplished!")
     except:
         error_logger.exception('exception has occurred in the main function...')
-
 
 def pull_process_and_push_data(device, device_attendance_logs=None):
     """ Takes a single device config as param and pulls data from that device.
@@ -89,6 +110,17 @@ def pull_process_and_push_data(device, device_attendance_logs=None):
         device_attendance_logs = get_all_attendance_from_device(device['ip'], device_id=device['device_id'], clear_from_device_on_fetch=device['clear_from_device_on_fetch'])
         if not device_attendance_logs:
             return
+
+    # Parse IMPORT_START_DATE from config
+    import_start_date = getattr(config, 'IMPORT_START_DATE', None)
+    if import_start_date:
+        # Assuming format is 'YYYYMMDD'
+        import_start_date_dt = datetime.datetime.strptime(import_start_date, '%Y%m%d')
+        # Filter logs
+        device_attendance_logs = [
+            log for log in device_attendance_logs
+            if log['timestamp'] >= import_start_date_dt
+        ]
 
     # Collect records for bulk processing
     records_to_insert = []
@@ -170,8 +202,8 @@ def send_to_erpnext_bulk(records):
         
         if response.status_code == 200 and response_data.get("success"):
             info_logger.info(f"Bulk insert result: {response_data.get('message')}")
+            # Only log failed records if they exist
             if response_data.get("details", {}).get("failed"):
-                # Log any partial failures
                 for failure in response_data["details"]["failed"]:
                     error_logger.error(f"Record failed: {json.dumps(failure, default=str)}")
             return 200, response_data.get("message")
@@ -299,6 +331,24 @@ def _safe_get_error_str(res):
         error_str = str(res.__dict__)
     return error_str
 
+def get_last_sync_of_checkin(shift_type_name):
+    url = f"{config.ERPNEXT_URL}/api/resource/Shift Type/{shift_type_name}"
+    headers = {
+        'Authorization': f"token {config.ERPNEXT_API_KEY}:{config.ERPNEXT_API_SECRET}",
+        'Accept': 'application/json'
+    }
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            last_sync = data['data'].get('last_sync_of_checkin')
+            if last_sync:
+                # Parse to datetime
+                return datetime.datetime.fromisoformat(last_sync)
+    except Exception as e:
+        error_logger.error(f"Failed to fetch last_sync_of_checkin: {e}")
+    return None
+
 # setup logger and status
 if not os.path.exists(config.LOGS_DIRECTORY):
     os.makedirs(config.LOGS_DIRECTORY)
@@ -317,3 +367,4 @@ def infinite_loop(sleep_time=15):
 
 if __name__ == "__main__":
     infinite_loop()
+
