@@ -114,9 +114,7 @@ def pull_process_and_push_data(device, device_attendance_logs=None):
     # Parse IMPORT_START_DATE from config
     import_start_date = getattr(config, 'IMPORT_START_DATE', None)
     if import_start_date:
-        # Assuming format is 'YYYYMMDD'
         import_start_date_dt = datetime.datetime.strptime(import_start_date, '%Y%m%d')
-        # Filter logs
         device_attendance_logs = [
             log for log in device_attendance_logs
             if log['timestamp'] >= import_start_date_dt
@@ -136,10 +134,12 @@ def pull_process_and_push_data(device, device_attendance_logs=None):
 
         records_to_insert.append({
             "attendance_device_id": device_attendance_log['user_id'],
-            "timestamp": device_attendance_log['timestamp'].isoformat(),  # Convert datetime to ISO format
+            "timestamp": device_attendance_log['timestamp'].isoformat(),
             "punch_type": punch_direction,
             "device_id": device['device_id'],
-            "status": "Pending"  # Default status
+            "status": "Pending",
+            "latitude": float(device.get('latitude', 0.0000)),  
+            "longitude": float(device.get('longitude', 0.0000))  
         })
 
     # Send records in bulk to ERPNext API
@@ -150,7 +150,7 @@ def pull_process_and_push_data(device, device_attendance_logs=None):
         attendance_failed_logger.error(f"Bulk insert failed: {erpnext_message}")
         if not any(error in erpnext_message for error in allowlisted_errors):
             raise Exception('Bulk insert to ERPNext failed.')
-
+        
 
 def get_all_attendance_from_device(ip, port=4370, timeout=30, device_id=None, clear_from_device_on_fetch=False):
     #  Sample Attendance Logs [{'punch': 255, 'user_id': '22', 'uid': 12349, 'status': 1, 'timestamp': datetime.datetime(2019, 2, 26, 20, 31, 29)},{'punch': 255, 'user_id': '7', 'uid': 7, 'status': 1, 'timestamp': datetime.datetime(2019, 2, 26, 20, 31, 36)}]
