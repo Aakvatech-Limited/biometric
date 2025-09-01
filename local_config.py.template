@@ -2,14 +2,14 @@
 # ERPNext related configs
 ERPNEXT_API_KEY = ''
 ERPNEXT_API_SECRET = ''
-ERPNEXT_URL = 'http://dev.local:8000'
-ERPNEXT_VERSION = 13
+ERPNEXT_URL = 'http://127.0.0.1:8000'
+ERPNEXT_VERSION = 15
 
 
 # operational configs
-PULL_FREQUENCY = 60 # in minutes
+PULL_FREQUENCY = 5 # in minutes
 LOGS_DIRECTORY = 'logs' # logs of this script is stored in this directory
-IMPORT_START_DATE = None # format: '20190501'
+IMPORT_START_DATE = '20250901' # format: '20190501'
 
 # Biometric device configs (all keys mandatory)
     #- device_id - must be unique, strictly alphanumerical chars only. no space allowed.
@@ -18,14 +18,14 @@ IMPORT_START_DATE = None # format: '20190501'
     #- clear_from_device_on_fetch: if set to true then attendance is deleted after fetch is successful.
                                     #(Caution: this feature can lead to data loss if used carelessly.)
 devices = [
-    {'device_id':'test_1','ip':'192.168.0.209', 'punch_direction': None, 'clear_from_device_on_fetch': False},
-    {'device_id':'test_2','ip':'192.168.2.209', 'punch_direction': None, 'clear_from_device_on_fetch': False}
+    {'device_id':'test_1','ip':'192.168.1.11', 'punch_direction': 'IN', 'clear_from_device_on_fetch': False, 'latitude': 12.9716, 'longitude': 77.5946},
+    {'device_id':'test_2','ip':'192.168.1.10', 'punch_direction': 'OUT', 'clear_from_device_on_fetch': False, 'latitude': 12.9716, 'longitude': 77.5946}
 ]
 
 # Configs updating sync timestamp in the Shift Type DocType 
 # please, read this thread to know why this is necessary https://discuss.erpnext.com/t/v-12-hr-auto-attendance-purpose-of-last-sync-of-checkin-in-shift-type/52997
 shift_type_device_mapping = [
-    {'shift_type_name': ['Shift1'], 'related_device_id': ['test_1','test_2']}
+    {'shift_type_name': ['Administration'], 'related_device_id': ['test_1','test_2']}
 ]
 
 
