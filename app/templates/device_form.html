@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if device else 'Add' }} Device — Biometric Sync{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>
+    <i class="bi bi-hdd-network me-2" style="color:var(--accent)"></i>
+    {{ 'Edit Device' if device else 'Add Device' }}
+  </h1>
+  <p>{{ 'Update device details.' if device else 'Register a new ZKTeco biometric device.' }}</p>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-7 col-lg-5">
+    <div class="card">
+      <div class="card-header">Device Details</div>
+      <div class="card-body p-4">
+        <form method="POST">
+          <div class="mb-3">
+            <label class="form-label text-muted" style="font-size:0.8rem">Device Name</label>
+            <input type="text" name="name" class="form-control"
+              placeholder="e.g. Main Gate" required
+              value="{{ device.name if device else '' }}">
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col">
+              <label class="form-label text-muted" style="font-size:0.8rem">Device ID</label>
+              <input type="number" name="device_id" class="form-control"
+                placeholder="1" min="1"
+                value="{{ device.device_id if device else 1 }}">
+              <div class="form-text" style="font-size:0.75rem">Physical device serial number</div>
+            </div>
+            <div class="col">
+              <label class="form-label text-muted" style="font-size:0.8rem">Port</label>
+              <input type="number" name="port" class="form-control"
+                placeholder="4370"
+                value="{{ device.port if device else 4370 }}">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted" style="font-size:0.8rem">IP Address</label>
+            <input type="text" name="ip_address" class="form-control"
+              placeholder="192.168.1.100" required
+              value="{{ device.ip_address if device else '' }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted" style="font-size:0.8rem">Punch Direction</label>
+            <select name="punch_direction" class="form-select">
+              {% for opt in ['AUTO', 'IN', 'OUT'] %}
+              <option value="{{ opt }}" {% if device and device.punch_direction == opt %}selected{% elif not device and opt == 'AUTO' %}selected{% endif %}>
+                {{ opt }}
+              </option>
+              {% endfor %}
+            </select>
+            <div class="form-text" style="font-size:0.75rem">
+              AUTO uses punch value from device. IN/OUT overrides all records.
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted" style="font-size:0.8rem">Shift Types</label>
+            <input type="text" name="shift_types" class="form-control"
+              placeholder="e.g. Morning Shift, Night Shift"
+              value="{{ selected_shift_types | join(', ') }}">
+            <div class="form-text" style="font-size:0.75rem">
+              Separate multiple shift types with a comma.
+              After sync, <code>last_sync_of_checkin</code> will be updated on each.
+            </div>
+          </div>
+          <div class="mb-4">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="is_active" id="isActive"
+                {% if not device or device.is_active %}checked{% endif %}>
+              <label class="form-check-label" for="isActive" style="font-size:0.875rem">
+                Active (include in auto sync)
+              </label>
+            </div>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-check-lg me-1"></i>{{ 'Save Changes' if device else 'Add Device' }}
+            </button>
+            <a href="{{ url_for('devices.index') }}" class="btn btn-sm btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

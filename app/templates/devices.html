@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Devices — Biometric Sync{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-start justify-content-between">
+  <div>
+    <h1><i class="bi bi-hdd-network me-2" style="color:var(--accent)"></i>Devices</h1>
+    <p>Manage ZKTeco biometric devices connected to this server.</p>
+  </div>
+  <a href="{{ url_for('devices.new') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>Add Device
+  </a>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 card-table">
+      <thead>
+        <tr>
+          <th>Device Name</th>
+          <th>Device ID</th>
+          <th>IP : Port</th>
+          <th>Direction</th>
+          <th>Active</th>
+          <th>Last Synced</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for device in devices %}
+        <tr>
+          <td data-label="Device">
+            <span class="status-dot {% if device.is_active %}online{% else %}offline{% endif %} me-1"></span>
+            <strong>{{ device.name }}</strong>
+          </td>
+          <td data-label="Device ID">
+            <span class="badge badge-muted-soft">{{ device.device_id }}</span>
+          </td>
+          <td data-label="IP : Port">
+            <code style="color:#79c0ff">{{ device.ip_address }}:{{ device.port }}</code>
+          </td>
+          <td data-label="Direction">
+            <span class="badge badge-muted-soft">{{ device.punch_direction }}</span>
+          </td>
+          <td data-label="Active">
+            {% if device.is_active %}
+              <span class="badge badge-success-soft">Yes</span>
+            {% else %}
+              <span class="badge badge-muted-soft">No</span>
+            {% endif %}
+          </td>
+          <td data-label="Last Synced" style="font-size:0.8rem; color:#8b949e">
+            {{ device.last_synced_at.strftime('%d %b %Y %H:%M') if device.last_synced_at else '—' }}
+          </td>
+          <td data-label="Status">
+            {% set status = device.last_sync_status %}
+            {% if status == 'Success' %}
+              <span class="badge badge-success-soft">Success</span>
+            {% elif status == 'Failed' %}
+              <span class="badge badge-danger-soft">Failed</span>
+            {% elif status == 'No Data' %}
+              <span class="badge badge-warning-soft">No Data</span>
+            {% else %}
+              <span class="badge badge-muted-soft">Never</span>
+            {% endif %}
+          </td>
+          <td class="td-actions">
+            <div class="d-flex gap-1 flex-wrap">
+              <button class="btn-sync" id="syncBtn-{{ device.id }}"
+                onclick="syncDevice({{ device.id }}, '{{ device.name }}')" title="Sync">
+                <i class="bi bi-arrow-repeat"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-secondary"
+                onclick="testDevice({{ device.id }}, '{{ device.name }}')" title="Test connection">
+                <i class="bi bi-wifi"></i>
+              </button>
+              <a href="{{ url_for('devices.logs', device_id=device.id) }}"
+                class="btn btn-sm btn-outline-secondary" title="View logs">
+                <i class="bi bi-journal-text"></i>
+              </a>
+              <a href="{{ url_for('devices.edit', device_id=device.id) }}"
+                class="btn btn-sm btn-outline-secondary" title="Edit">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="POST" action="{{ url_for('devices.delete', device_id=device.id) }}"
+                onsubmit="return confirm('Delete {{ device.name }}?')">
+                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" class="text-center py-5" style="color:#8b949e">
+            <i class="bi bi-hdd-network" style="font-size:2rem; display:block; margin-bottom:0.5rem"></i>
+            No devices configured yet.
+            <a href="{{ url_for('devices.new') }}" class="d-block mt-1">Add your first device →</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  <div id="syncToast" class="toast">
+    <div class="toast-header">
+      <i class="bi bi-fingerprint me-2" style="color:var(--accent)"></i>
+      <strong class="me-auto">Result</strong>
+      <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+    </div>
+    <div class="toast-body" id="toastBody"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showToast(msg, ok) {
+  const t = document.getElementById('syncToast');
+  document.getElementById('toastBody').textContent = msg;
+  t.className = `toast text-white ${ok ? 'bg-success' : 'bg-danger'}`;
+  new bootstrap.Toast(t, { delay: 4000 }).show();
+}
+
+async function syncDevice(id, name) {
+  const btn = document.getElementById(`syncBtn-${id}`);
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+  const res = await fetch(`/api/sync/${id}`, { method: 'POST' });
+  const data = await res.json();
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-arrow-repeat"></i>';
+  if (data.success) {
+    const l = data.log;
+    showToast(`${name}: Pulled ${l.records_pulled}, Pushed ${l.records_pushed}`, true);
+  } else {
+    showToast(`${name}: ${data.error || data.log?.message}`, false);
+  }
+  setTimeout(() => location.reload(), 2000);
+}
+
+async function testDevice(id, name) {
+  showToast(`Testing ${name}…`, true);
+  const res = await fetch(`/api/test-device/${id}`, { method: 'POST' });
+  const data = await res.json();
+  if (data.success) {
+    showToast(`${name}: Connected! SN: ${data.device_info?.serialnumber || 'N/A'}`, true);
+  } else {
+    showToast(`${name}: ${data.message}`, false);
+  }
+}
+</script>
+{% endblock %}
