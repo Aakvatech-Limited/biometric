@@ -242,10 +242,48 @@ def _get_venv_pythonw() -> str:
     return sys.executable
 
 
+def _ps_quote(s: str) -> str:
+    """Quote a string as a single-quoted PowerShell literal."""
+    return "'" + s.replace("'", "''") + "'"
+
+
+def _run_schtasks_elevated(args: list) -> subprocess.CompletedProcess:
+    """Re-run a schtasks command with a UAC elevation prompt.
+
+    Fallback for machines where a standard user has no write access to the
+    Task Scheduler at all (creation fails with "Access is denied" even
+    without requesting /rl highest — seen on locked-down corporate images).
+    Only the *creation* step is elevated; the task itself still runs
+    unprivileged once its trigger fires, since we never request /rl highest.
+    """
+    arg_list = ",".join(_ps_quote(a) for a in args)
+    ps_cmd = (
+        f"$p = Start-Process -FilePath schtasks -ArgumentList @({arg_list}) "
+        "-Verb RunAs -Wait -PassThru -WindowStyle Hidden; exit $p.ExitCode"
+    )
+    return subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_cmd],
+        capture_output=True, text=True, timeout=60,
+    )
+
+
 def _install_windows() -> dict:
     """Create a Windows startup task using Task Scheduler."""
     pythonw = _get_venv_pythonw()
     server_py = os.path.join(APP_DIR, "server.py")
+
+    # Deliberately no /rl highest here: Task Scheduler refuses to create an
+    # elevated-privilege task unless the calling process is already running
+    # as Administrator. The service doesn't need elevation — it just runs a
+    # Flask server on an unprivileged port, same as the Linux systemd user
+    # service.
+    create_args = [
+        "/create",
+        "/tn", TASK_NAME,
+        "/tr", f'"{pythonw}" "{server_py}"',
+        "/sc", "onlogon",
+        "/f",
+    ]
 
     try:
         # Remove existing task if present
@@ -254,21 +292,27 @@ def _install_windows() -> dict:
             capture_output=True, timeout=15,
         )
 
-        # Create a new task that runs at logon
         result = subprocess.run(
-            [
-                "schtasks", "/create",
-                "/tn", TASK_NAME,
-                "/tr", f'"{pythonw}" "{server_py}"',
-                "/sc", "onlogon",
-                "/rl", "highest",
-                "/f",
-            ],
+            ["schtasks"] + create_args,
             capture_output=True, text=True, timeout=15,
         )
 
         if result.returncode != 0:
-            raise RuntimeError(f"schtasks failed: {result.stderr}")
+            stderr = (result.stderr or "").strip()
+            if "access is denied" in stderr.lower():
+                # This machine denies standard users write access to Task
+                # Scheduler entirely — retry once via a UAC consent prompt.
+                elevated = _run_schtasks_elevated(create_args)
+                if elevated.returncode != 0:
+                    raise RuntimeError(
+                        "Access denied creating the scheduled task, even "
+                        "after requesting admin approval. Your IT policy "
+                        "may block Task Scheduler for this account — ask "
+                        "an administrator to grant access, or create the "
+                        "task manually."
+                    )
+            else:
+                raise RuntimeError(f"schtasks failed: {stderr}")
 
         logger.info("Windows scheduled task installed and enabled.")
         return {
@@ -290,14 +334,27 @@ def _uninstall_windows() -> dict:
     ``schtasks /end`` would kill this very process mid-request — the API
     layer schedules a delayed self-exit instead).
     """
+    delete_args = ["/delete", "/tn", TASK_NAME, "/f"]
+
     try:
         result = subprocess.run(
-            ["schtasks", "/delete", "/tn", TASK_NAME, "/f"],
+            ["schtasks"] + delete_args,
             capture_output=True, text=True, timeout=15,
         )
 
-        if result.returncode != 0 and "cannot find" not in (result.stderr or "").lower():
-            raise RuntimeError(f"schtasks delete failed: {result.stderr}")
+        if result.returncode != 0:
+            stderr = (result.stderr or "").strip()
+            if "cannot find" in stderr.lower():
+                pass
+            elif "access is denied" in stderr.lower():
+                elevated = _run_schtasks_elevated(delete_args)
+                if elevated.returncode != 0:
+                    raise RuntimeError(
+                        "Access denied removing the scheduled task, even "
+                        "after requesting admin approval."
+                    )
+            else:
+                raise RuntimeError(f"schtasks delete failed: {stderr}")
 
         logger.info("Windows scheduled task uninstalled.")
         return {
