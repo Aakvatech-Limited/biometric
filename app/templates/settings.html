@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% block title %}Settings — Biometric Sync{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1><i class="bi bi-sliders me-2" style="color:var(--accent)"></i>Settings</h1>
+  <p>ERPNext API credentials and sync schedule configuration.</p>
+</div>
+
+<div class="row">
+  <div class="col-12 col-md-8 col-lg-6">
+    <div class="card mb-4">
+      <div class="card-header">ERPNext Connection</div>
+      <div class="card-body p-4">
+        <form method="POST">
+          <div class="mb-3">
+            <label class="form-label text-muted" style="font-size:0.8rem">ERPNext URL</label>
+            <input type="url" name="erpnext_url" class="form-control"
+              placeholder="https://erp.yourcompany.com"
+              value="{{ settings.erpnext_url }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted" style="font-size:0.8rem">API Key</label>
+            <input type="text" name="api_key" class="form-control"
+              placeholder="Your ERPNext API Key"
+              value="{{ settings.api_key }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted" style="font-size:0.8rem">API Secret</label>
+            <input type="password" name="api_secret" class="form-control"
+              placeholder="Your ERPNext API Secret"
+              value="{{ settings.api_secret }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted" style="font-size:0.8rem">ERPNext Version</label>
+            <select name="erpnext_version" class="form-select">
+              <option value="14" {% if settings.erpnext_version == '14' %}selected{% endif %}>Version 14</option>
+              <option value="15" {% if settings.erpnext_version == '15' %}selected{% endif %}>Version 15</option>
+              <option value="16" {% if settings.erpnext_version == '16' %}selected{% endif %}>Version 16</option>
+            </select>
+          </div>
+          <hr style="border-color:var(--sidebar-border)">
+          <div class="mb-3">
+            <label class="form-label text-muted" style="font-size:0.8rem">Sync Interval (minutes)</label>
+            <input type="number" name="sync_interval" class="form-control"
+              min="5" max="1440"
+              value="{{ settings.sync_interval }}">
+            <div class="form-text" style="font-size:0.75rem">Minimum: 5 minutes</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted" style="font-size:0.8rem">Import Start Date</label>
+            <input type="date" name="import_start_date" class="form-control"
+              value="{{ settings.import_start_date.isoformat() if settings.import_start_date else '' }}">
+            <div class="form-text" style="font-size:0.75rem">
+              Only import attendance records on or after this date. Leave blank to import all records.
+            </div>
+          </div>
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="enable_auto_sync" id="autoSync"
+                {% if settings.enable_auto_sync %}checked{% endif %}>
+              <label class="form-check-label" for="autoSync" style="font-size:0.875rem">
+                Enable Auto Sync
+              </label>
+            </div>
+          </div>
+          <div class="mb-4">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="enable_staging" id="enableStaging"
+                {% if settings.enable_staging %}checked{% endif %}>
+              <label class="form-check-label" for="enableStaging" style="font-size:0.875rem">
+                Send to Biometric Data Staging
+              </label>
+            </div>
+            <div class="form-text" style="font-size:0.75rem">
+              When enabled, raw attendance records are pushed to the
+              <code>biometric_client</code> staging table instead of creating
+              Employee Checkins directly. The staging table's hourly job will
+              then create Employee Checkins automatically. When disabled,
+              Employee Checkins are created directly on each sync instead.
+            </div>
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-check-lg me-1"></i>Save Settings
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Test Connection -->
+    <div class="card mb-4">
+      <div class="card-header">Test Connection</div>
+      <div class="card-body p-4">
+        <p style="font-size:0.875rem; color:#8b949e">
+          Verify that the saved API credentials can successfully authenticate with ERPNext.
+        </p>
+        <form method="POST" action="{{ url_for('settings.test_connection') }}">
+          <button type="submit" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-wifi me-1"></i>Test ERPNext Connection
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Background Service -->
+    <div class="card">
+      <div class="card-header"><i class="bi bi-gear-wide-connected me-1"></i>Background Service</div>
+      <div class="card-body p-4">
+        <p style="font-size:0.875rem; color:#8b949e">
+          Install the app as a background service so it runs automatically on boot —
+          no terminal window needed.
+        </p>
+        <p class="mb-3" style="font-size:0.875rem">
+          Status: <span id="svcStatus" class="badge badge-muted-soft">Checking…</span>
+        </p>
+        <div id="svcMessage" class="alert alert-info d-none py-2 mb-3" style="font-size:0.8rem"></div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button type="button" class="btn btn-primary btn-sm" id="svcInstallBtn" onclick="serviceStart()">
+            <i class="bi bi-box-arrow-in-down me-1"></i>Install &amp; Run in Background
+          </button>
+          <button type="button" class="btn btn-outline-danger btn-sm" id="svcRemoveBtn" onclick="serviceStop()">
+            <i class="bi bi-x-circle me-1"></i>Remove from Auto-Start
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help sidebar -->
+  <div class="col-12 col-md-4 col-lg-4 mt-4 mt-md-0">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-info-circle me-1"></i>How to get API Keys</div>
+      <div class="card-body p-3" style="font-size:0.8rem; color:#8b949e; line-height:1.7">
+        <ol class="ps-3">
+          <li>Open ERPNext and go to the <strong style="color:#c9d1d9">User</strong> record you want to use.</li>
+          <li>Scroll to <strong style="color:#c9d1d9">API Access</strong> section.</li>
+          <li>Click <strong style="color:#c9d1d9">Generate Keys</strong>.</li>
+          <li>Copy the <strong style="color:#c9d1d9">API Key</strong> and <strong style="color:#c9d1d9">API Secret</strong> here.</li>
+        </ol>
+        <hr style="border-color:var(--sidebar-border)">
+        <p class="mb-1"><strong style="color:#c9d1d9">Required permissions</strong></p>
+        <ul class="ps-3 mb-0">
+          <li>Create on <code>Employee Checkin</code></li>
+          <li>Read on <code>Employee</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function svcShowMessage(text, kind) {
+  const box = document.getElementById("svcMessage");
+  box.className = "alert alert-" + (kind || "info") + " py-2 mb-3";
+  box.style.fontSize = "0.8rem";
+  box.textContent = text;
+}
+
+async function svcRefreshStatus() {
+  const badge = document.getElementById("svcStatus");
+  try {
+    const res = await fetch("/api/service/info");
+    const data = await res.json();
+    if (data.installed) {
+      badge.className = "badge badge-success-soft";
+      badge.textContent = "Installed (auto-starts on boot)";
+      document.getElementById("svcInstallBtn").disabled = true;
+      document.getElementById("svcRemoveBtn").disabled = false;
+    } else {
+      badge.className = "badge badge-muted-soft";
+      badge.textContent = "Not installed";
+      document.getElementById("svcInstallBtn").disabled = false;
+      document.getElementById("svcRemoveBtn").disabled = true;
+    }
+  } catch (e) {
+    badge.className = "badge badge-danger-soft";
+    badge.textContent = "Unknown";
+  }
+}
+
+async function serviceStart() {
+  const btn = document.getElementById("svcInstallBtn");
+  btn.disabled = true;
+  svcShowMessage("Installing background service…", "info");
+  try {
+    const res = await fetch("/api/service/start", { method: "POST" });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || "Install failed");
+    if (data.handoff) {
+      svcShowMessage(data.message + " The page will reload once the background service is up.", "success");
+      // Foreground process exits in ~4s; poll until the service answers again
+      setTimeout(function poll() {
+        fetch("/api/service/info")
+          .then(() => window.location.reload())
+          .catch(() => setTimeout(poll, 1500));
+      }, 6000);
+    } else {
+      svcShowMessage(data.message, "success");
+      svcRefreshStatus();
+    }
+  } catch (e) {
+    svcShowMessage("Error: " + e.message, "danger");
+    btn.disabled = false;
+  }
+}
+
+async function serviceStop() {
+  if (!confirm("Remove the background service? The app will no longer start automatically on boot.")) return;
+  const btn = document.getElementById("svcRemoveBtn");
+  btn.disabled = true;
+  svcShowMessage("Removing background service…", "info");
+  try {
+    const res = await fetch("/api/service/stop", { method: "POST" });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || "Uninstall failed");
+    svcShowMessage(data.message, "success");
+    svcRefreshStatus();
+  } catch (e) {
+    // If we were running AS the background service, systemd stops this
+    // process mid-request and the fetch fails — that still means success.
+    svcShowMessage("Background service removed. If the page stops responding, " +
+                   "restart the app with the setup script.", "warning");
+    svcRefreshStatus();
+  }
+}
+
+svcRefreshStatus();
+</script>
+{% endblock %}
