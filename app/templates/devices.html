@@ -19,7 +19,7 @@
         <tr>
           <th>Device Name</th>
           <th>Device ID</th>
-          <th>IP : Port</th>
+          <th>{{ 'Terminal SN' if attendance_source == 'biotime' else 'IP : Port' }}</th>
           <th>Direction</th>
           <th>Active</th>
           <th>Last Synced</th>
@@ -37,8 +37,12 @@
           <td data-label="Device ID">
             <span class="badge badge-muted-soft">{{ device.device_id }}</span>
           </td>
-          <td data-label="IP : Port">
-            <code style="color:#79c0ff">{{ device.ip_address }}:{{ device.port }}</code>
+          <td data-label="{{ 'Terminal SN' if attendance_source == 'biotime' else 'IP : Port' }}">
+            {% if attendance_source == 'biotime' %}
+              <code style="color:#79c0ff">{{ device.terminal_sn or '—' }}</code>
+            {% else %}
+              <code style="color:#79c0ff">{{ device.ip_address }}:{{ device.port }}</code>
+            {% endif %}
           </td>
           <td data-label="Direction">
             <span class="badge badge-muted-soft">{{ device.punch_direction }}</span>

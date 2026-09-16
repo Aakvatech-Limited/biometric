@@ -22,6 +22,24 @@
               placeholder="e.g. Main Gate" required
               value="{{ device.name if device else '' }}">
           </div>
+          {% if attendance_source == 'biotime' %}
+          <div class="mb-3">
+            <label class="form-label text-muted" style="font-size:0.8rem">Device ID</label>
+            <input type="number" name="device_id" class="form-control"
+              placeholder="1" min="1"
+              value="{{ device.device_id if device else 1 }}">
+            <div class="form-text" style="font-size:0.75rem">Tag sent to ERPNext with each Checkin.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted" style="font-size:0.8rem">Terminal Serial Number</label>
+            <input type="text" name="terminal_sn" class="form-control"
+              placeholder="e.g. CMK8213960" required
+              value="{{ device.terminal_sn if device else '' }}">
+            <div class="form-text" style="font-size:0.75rem">
+              The serial number this terminal is registered under in BioTime.
+            </div>
+          </div>
+          {% else %}
           <div class="row g-3 mb-3">
             <div class="col">
               <label class="form-label text-muted" style="font-size:0.8rem">Device ID</label>
@@ -43,6 +61,7 @@
               placeholder="192.168.1.100" required
               value="{{ device.ip_address if device else '' }}">
           </div>
+          {% endif %}
           <div class="mb-3">
             <label class="form-label text-muted" style="font-size:0.8rem">Punch Direction</label>
             <select name="punch_direction" class="form-select">

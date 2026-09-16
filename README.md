@@ -15,7 +15,7 @@ into ERPNext Employee Checkin records.
 - **Windows:** double-click `setup_windows.bat`
 
 The script auto-creates the virtual environment, installs dependencies,
-starts the app, and opens http://localhost:5000 in your browser. No manual
+starts the app, and opens http://localhost:5050 in your browser. No manual
 venv or pip commands needed. Equivalent manual command:
 
 ```bash
@@ -32,6 +32,29 @@ before launching.
 2. **Devices** → Add each ZKTeco device (IP, port, direction)
 3. **ERPNext** → On each Employee record, set `Attendance Device ID` to match the device user ID
 4. **Settings** → Enable Auto Sync and set your sync interval
+
+## Attendance Source: Direct vs BioTime
+
+By default the app connects to each ZKTeco device directly (`pull_attendance` in
+`app/services/zk_service.py`). If your site instead runs ZKTeco's own **BioTime**
+middleware (which already owns the device connections via its ADMS/iClock push
+protocol), switch the whole app over in **Settings → Attendance Source**:
+
+- **Direct** — this app opens its own TCP/UDP session to each device's IP:port
+  (the original behavior). Devices are configured with an IP address and port.
+- **BioTime** — this app instead fetches already-captured punches from a BioTime
+  server's REST API (`app/services/biotime_service.py`). Enter the BioTime URL,
+  username, and password in Settings, then set each device's **Terminal Serial
+  Number** (as registered in BioTime) instead of an IP/port.
+
+This is a single switch for the whole install — one running instance is either
+fully Direct or fully BioTime-backed, not a per-device mix. Whichever source is
+active, the destination (Employee Checkin vs. Biometric Data Staging, below) is
+unaffected — it's an independent setting.
+
+Before pointing production sync at a BioTime server for the first time, run
+`diagnose_biotime.py <url> <username> <password>` to confirm connectivity and
+inspect the raw transaction data your BioTime version returns.
 
 ## How it Works
 

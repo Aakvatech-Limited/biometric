@@ -17,7 +17,8 @@ def _get_device_or_404(device_id: int):
 
 @devices_bp.route("/")
 def index():
-    return render_template("devices.html", devices=store.get_devices())
+    return render_template("devices.html", devices=store.get_devices(),
+                           attendance_source=store.get_settings().attendance_source)
 
 
 @devices_bp.route("/new", methods=["GET", "POST"])
@@ -26,15 +27,17 @@ def new():
         device = store.add_device(
             name=request.form["name"],
             device_id=int(request.form.get("device_id", 1)),
-            ip_address=request.form["ip_address"],
+            ip_address=request.form.get("ip_address", ""),
             port=int(request.form.get("port", 4370)),
+            terminal_sn=request.form.get("terminal_sn", "").strip(),
             punch_direction=request.form.get("punch_direction", "AUTO"),
             is_active=bool(request.form.get("is_active")),
             shift_types=_parse_shift_types(request.form.get("shift_types", "")),
         )
         flash(f'Device "{device.name}" added.', "success")
         return redirect(url_for("devices.index"))
-    return render_template("device_form.html", device=None, selected_shift_types=[])
+    return render_template("device_form.html", device=None, selected_shift_types=[],
+                           attendance_source=store.get_settings().attendance_source)
 
 
 @devices_bp.route("/<int:device_id>/edit", methods=["GET", "POST"])
@@ -45,8 +48,9 @@ def edit(device_id):
             device_id,
             name=request.form["name"],
             device_id=int(request.form.get("device_id", 1)),
-            ip_address=request.form["ip_address"],
+            ip_address=request.form.get("ip_address", ""),
             port=int(request.form.get("port", 4370)),
+            terminal_sn=request.form.get("terminal_sn", "").strip(),
             punch_direction=request.form.get("punch_direction", "AUTO"),
             is_active=bool(request.form.get("is_active")),
             shift_types=_parse_shift_types(request.form.get("shift_types", "")),
@@ -54,7 +58,8 @@ def edit(device_id):
         flash(f'Device "{device.name}" updated.', "success")
         return redirect(url_for("devices.index"))
     return render_template("device_form.html", device=device,
-                           selected_shift_types=device.shift_types)
+                           selected_shift_types=device.shift_types,
+                           attendance_source=store.get_settings().attendance_source)
 
 
 @devices_bp.route("/<int:device_id>/delete", methods=["POST"])

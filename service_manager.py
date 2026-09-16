@@ -108,7 +108,7 @@ def _install_linux() -> dict:
     venv_python = _get_venv_python()
     server_py = os.path.join(APP_DIR, "server.py")
     log_file = os.path.join(APP_DIR, "biometric_sync.log")
-    port = os.environ.get("BIOMETRIC_PORT", "5000")
+    port = os.environ.get("BIOMETRIC_PORT", "5050")
 
     # Paths are double-quoted in ExecStart because the app directory may
     # contain spaces; systemd splits unquoted arguments on whitespace.

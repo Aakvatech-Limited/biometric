@@ -9,6 +9,7 @@ import logging
 
 from app import store
 from app.services.zk_service import pull_attendance
+from app.services.biotime_service import pull_transactions
 from app.services.erpnext_service import ERPNextClient
 
 logger = logging.getLogger(__name__)
@@ -29,13 +30,33 @@ def sync_device(device: store.Device) -> store.LogEntry:
             message="ERPNext credentials not configured. Go to Settings and save your API credentials.",
         )
 
+    if settings.attendance_source == "biotime":
+        if not settings.biotime_url or not settings.biotime_username or not settings.biotime_password:
+            return store.add_log(
+                device.id,
+                status="Failed",
+                message="BioTime credentials not configured. Go to Settings and save your BioTime URL/username/password.",
+            )
+        if not device.terminal_sn:
+            return store.add_log(
+                device.id,
+                status="Failed",
+                message="This device has no Terminal Serial Number set — required in BioTime mode.",
+            )
+
     pulled = 0
     pushed = 0
     skipped = 0
 
     try:
-        # 1. Pull from device
-        records = pull_attendance(device.ip_address, port=device.port)
+        # 1. Pull attendance records — from BioTime, or directly from the device
+        if settings.attendance_source == "biotime":
+            records = pull_transactions(
+                settings.biotime_url, settings.biotime_username, settings.biotime_password,
+                terminal_sn=device.terminal_sn, since=device.last_synced_at,
+            )
+        else:
+            records = pull_attendance(device.ip_address, port=device.port)
         pulled = len(records)
 
         if pulled == 0:

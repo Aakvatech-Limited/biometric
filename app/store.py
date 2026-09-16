@@ -35,6 +35,10 @@ DEFAULT_SETTINGS = {
     "enable_auto_sync": False,
     "import_start_date": None,   # ISO date string or None
     "enable_staging": False,
+    "attendance_source": "direct",   # "direct" (pyzk) or "biotime" (BioTime REST API)
+    "biotime_url": "",
+    "biotime_username": "",
+    "biotime_password": "",
 }
 
 _lock = threading.RLock()
@@ -82,6 +86,10 @@ class Settings:
         self.enable_auto_sync = bool(raw.get("enable_auto_sync"))
         self.import_start_date = _parse_date(raw.get("import_start_date"))
         self.enable_staging = bool(raw.get("enable_staging"))
+        self.attendance_source = raw.get("attendance_source", "direct")
+        self.biotime_url = raw.get("biotime_url", "")
+        self.biotime_username = raw.get("biotime_username", "")
+        self.biotime_password = raw.get("biotime_password", "")
 
 
 class Device:
@@ -91,6 +99,7 @@ class Device:
         self.device_id = int(raw.get("device_id") or 1)
         self.ip_address = raw.get("ip_address", "")
         self.port = int(raw.get("port") or 4370)
+        self.terminal_sn = raw.get("terminal_sn", "")
         self.punch_direction = raw.get("punch_direction", "AUTO")
         self.is_active = bool(raw.get("is_active", True))
         self.shift_types = list(raw.get("shift_types", []))
@@ -111,6 +120,7 @@ class Device:
             "device_id": self.device_id,
             "ip_address": self.ip_address,
             "port": self.port,
+            "terminal_sn": self.terminal_sn,
             "punch_direction": self.punch_direction,
             "is_active": self.is_active,
             "last_synced_at": self.last_synced_at.isoformat() if self.last_synced_at else None,
@@ -212,6 +222,7 @@ def save_settings(**fields) -> Settings:
                 value = value.isoformat()
             s[key] = value
         s["erpnext_url"] = (s.get("erpnext_url") or "").rstrip("/")
+        s["biotime_url"] = (s.get("biotime_url") or "").rstrip("/")
         try:
             s["sync_interval"] = max(5, int(s.get("sync_interval") or 60))
         except (ValueError, TypeError):
@@ -244,7 +255,7 @@ def get_device(device_id: int):
 
 
 def add_device(name, device_id, ip_address, port, punch_direction,
-               is_active, shift_types) -> Device:
+               is_active, shift_types, terminal_sn="") -> Device:
     with _lock:
         _ensure_loaded()
         new_id = _data["next_device_id"]
@@ -255,6 +266,7 @@ def add_device(name, device_id, ip_address, port, punch_direction,
             "device_id": int(device_id),
             "ip_address": ip_address,
             "port": int(port),
+            "terminal_sn": terminal_sn,
             "punch_direction": punch_direction,
             "is_active": bool(is_active),
             "shift_types": list(shift_types),
@@ -273,7 +285,7 @@ def update_device(record_id: int, **fields):
         _ensure_loaded()
         for d in _data["devices"]:
             if d["id"] == record_id:
-                for key in ("name", "device_id", "ip_address", "port",
+                for key in ("name", "device_id", "ip_address", "port", "terminal_sn",
                             "punch_direction", "is_active", "shift_types"):
                     if key in fields:
                         d[key] = fields[key]

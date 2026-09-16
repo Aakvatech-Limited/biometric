@@ -42,8 +42,13 @@ def test_device(device_id):
     device = store.get_device(device_id)
     if device is None:
         abort(404)
-    from app.services.zk_service import test_connection
-    result = test_connection(device.ip_address, device.port)
+    settings = store.get_settings()
+    if settings.attendance_source == "biotime":
+        from app.services.biotime_service import test_connection
+        result = test_connection(settings.biotime_url, settings.biotime_username, settings.biotime_password)
+    else:
+        from app.services.zk_service import test_connection
+        result = test_connection(device.ip_address, device.port)
     return jsonify(result)
 
 

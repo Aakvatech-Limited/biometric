@@ -36,7 +36,7 @@ PIP_BIN = os.path.join(
     VENV_DIR, "Scripts" if IS_WINDOWS else "bin", "pip.exe" if IS_WINDOWS else "pip"
 )
 
-PORT = int(os.environ.get("BIOMETRIC_PORT", 5000))
+PORT = int(os.environ.get("BIOMETRIC_PORT", 5050))
 DASHBOARD_URL = f"http://localhost:{PORT}"
 
 

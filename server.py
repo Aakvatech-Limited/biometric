@@ -2,7 +2,7 @@
 Flask server entry point for Biometric Sync.
 
 Runs the app factory, starts the background sync scheduler, and serves
-the dashboard on http://localhost:5000.
+the dashboard on http://localhost:5050.
 
 Normally launched via ``run.py`` (foreground) or the installed
 background service (systemd / Task Scheduler).
@@ -14,7 +14,7 @@ from app import create_app
 from app.scheduler import start_scheduler
 
 IS_BACKGROUND = os.environ.get("BIOMETRIC_SYNC_SERVICE_MODE") == "background"
-PORT = int(os.environ.get("BIOMETRIC_PORT", 5000))
+PORT = int(os.environ.get("BIOMETRIC_PORT", 5050))
 
 # Suppress noisy werkzeug request logs when running as a background service
 if IS_BACKGROUND:
