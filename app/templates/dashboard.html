@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Biometric Sync{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-start justify-content-between">
+  <div>
+    <h1><i class="bi bi-grid-1x2 me-2" style="color:var(--accent)"></i>Dashboard</h1>
+    <p>Overview of all devices and recent sync activity.</p>
+  </div>
+  <button class="btn btn-primary btn-sm" id="syncAllBtn" onclick="syncAll()">
+    <i class="bi bi-arrow-repeat me-1"></i> Sync All
+  </button>
+</div>
+
+<!-- Stats row -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card stat-card">
+      <div class="stat-value text-white">{{ stats.total_devices }}</div>
+      <div class="stat-label"><i class="bi bi-hdd-network me-1"></i>Total Devices</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card">
+      <div class="stat-value" style="color:var(--accent)">{{ stats.active_devices }}</div>
+      <div class="stat-label"><i class="bi bi-check-circle me-1"></i>Active Devices</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card">
+      <div class="stat-value text-white">{{ stats.total_syncs }}</div>
+      <div class="stat-label"><i class="bi bi-arrow-repeat me-1"></i>Total Syncs</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card">
+      <div class="stat-value" style="color:#f85149">{{ stats.failed_syncs }}</div>
+      <div class="stat-label"><i class="bi bi-x-circle me-1"></i>Failed Syncs</div>
+    </div>
+  </div>
+</div>
+
+<!-- Devices -->
+<div class="card mb-4">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span><i class="bi bi-hdd-network me-2"></i>Devices</span>
+    <a href="{{ url_for('devices.new') }}" class="btn btn-sm btn-primary">
+      <i class="bi bi-plus-lg me-1"></i>Add Device
+    </a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 card-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>IP Address</th>
+          <th>Direction</th>
+          <th>Last Synced</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for device in devices %}
+        <tr>
+          <td data-label="Name">
+            <span class="status-dot {% if device.is_active %}online{% else %}offline{% endif %} me-1"></span>
+            {{ device.name }}
+          </td>
+          <td data-label="IP"><code style="color:#79c0ff">{{ device.ip_address }}:{{ device.port }}</code></td>
+          <td data-label="Direction"><span class="badge badge-muted-soft">{{ device.punch_direction }}</span></td>
+          <td data-label="Last Synced" style="font-size:0.8rem; color:#8b949e">
+            {{ device.last_synced_at.strftime('%d %b %Y %H:%M') if device.last_synced_at else '—' }}
+          </td>
+          <td data-label="Status">
+            {% set status = device.last_sync_status %}
+            {% if status == 'Success' %}
+              <span class="badge badge-success-soft">Success</span>
+            {% elif status == 'Failed' %}
+              <span class="badge badge-danger-soft">Failed</span>
+            {% elif status == 'No Data' %}
+              <span class="badge badge-warning-soft">No Data</span>
+            {% else %}
+              <span class="badge badge-muted-soft">Never</span>
+            {% endif %}
+          </td>
+          <td class="td-actions">
+            <button class="btn-sync" id="syncBtn-{{ device.id }}" onclick="syncDevice({{ device.id }}, '{{ device.name }}')">
+              <i class="bi bi-arrow-repeat"></i> Sync
+            </button>
+            <a href="{{ url_for('devices.logs', device_id=device.id) }}" class="btn btn-sm btn-outline-secondary ms-1">
+              <i class="bi bi-journal-text"></i>
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="text-center py-4" style="color:#8b949e">
+            No devices yet. <a href="{{ url_for('devices.new') }}">Add your first device →</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Recent Logs -->
+<div class="card">
+  <div class="card-header"><i class="bi bi-journal-code me-2"></i>Recent Sync Logs</div>
+  <div class="table-responsive">
+    <table class="table mb-0 card-table">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Device</th>
+          <th>Status</th>
+          <th>Pulled</th>
+          <th>Pushed</th>
+          <th>Skipped</th>
+          <th>Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in recent_logs %}
+        <tr>
+          <td data-label="Time" style="font-size:0.8rem; color:#8b949e; white-space:nowrap">
+            {{ log.synced_at.strftime('%d %b %H:%M:%S') }}
+          </td>
+          <td data-label="Device" style="font-size:0.875rem">{{ log.device_name }}</td>
+          <td data-label="Status">
+            {% if log.status == 'Success' %}
+              <span class="badge badge-success-soft">Success</span>
+            {% elif log.status == 'Failed' %}
+              <span class="badge badge-danger-soft">Failed</span>
+            {% else %}
+              <span class="badge badge-warning-soft">{{ log.status }}</span>
+            {% endif %}
+          </td>
+          <td data-label="Pulled" style="font-size:0.875rem">{{ log.records_pulled }}</td>
+          <td data-label="Pushed" style="font-size:0.875rem">{{ log.records_pushed }}</td>
+          <td data-label="Skipped" style="font-size:0.875rem">{{ log.records_skipped }}</td>
+          <td data-label="Message" style="font-size:0.8rem; color:#8b949e">
+            {{ log.message or '—' }}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center py-4" style="color:#8b949e">No sync logs yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  <div id="syncToast" class="toast" role="alert">
+    <div class="toast-header">
+      <i class="bi bi-fingerprint me-2" style="color:var(--accent)"></i>
+      <strong class="me-auto">Sync Result</strong>
+      <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+    </div>
+    <div class="toast-body" id="syncToastBody"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showToast(msg, success) {
+  const toastEl = document.getElementById('syncToast');
+  document.getElementById('syncToastBody').textContent = msg;
+  toastEl.classList.toggle('bg-success', success);
+  toastEl.classList.toggle('bg-danger', !success);
+  new bootstrap.Toast(toastEl, { delay: 4000 }).show();
+}
+
+async function syncDevice(deviceId, name) {
+  const btn = document.getElementById(`syncBtn-${deviceId}`);
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Syncing…';
+  try {
+    const res = await fetch(`/api/sync/${deviceId}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      const l = data.log;
+      showToast(`${name}: Pulled ${l.records_pulled}, Pushed ${l.records_pushed}, Skipped ${l.records_skipped}`, true);
+    } else {
+      showToast(`${name}: ${data.error || data.log?.message || 'Failed'}`, false);
+    }
+  } catch (e) {
+    showToast(`${name}: Network error`, false);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Sync';
+    setTimeout(() => location.reload(), 2000);
+  }
+}
+
+async function syncAll() {
+  const btn = document.getElementById('syncAllBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Syncing…';
+  try {
+    const res = await fetch('/api/sync/all', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`Synced ${data.logs.length} device(s).`, true);
+    } else {
+      showToast(`Error: ${data.error}`, false);
+    }
+  } catch (e) {
+    showToast('Network error', false);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i> Sync All';
+    setTimeout(() => location.reload(), 2000);
+  }
+}
+</script>
+{% endblock %}
