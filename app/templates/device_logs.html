@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Logs — {{ device.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <a href="{{ url_for('devices.index') }}" style="color:#8b949e; font-size:0.8rem; text-decoration:none">
+    <i class="bi bi-arrow-left me-1"></i>Devices
+  </a>
+  <h1 class="mt-1"><i class="bi bi-journal-code me-2" style="color:var(--accent)"></i>{{ device.name }} — Sync Logs</h1>
+  <p>{{ device.ip_address }}:{{ device.port }} &middot; Last 50 records</p>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table mb-0 card-table">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Status</th>
+          <th>Pulled</th>
+          <th>Pushed</th>
+          <th>Skipped</th>
+          <th>Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td data-label="Time" style="font-size:0.8rem; color:#8b949e; white-space:nowrap">
+            {{ log.synced_at.strftime('%d %b %Y %H:%M:%S') }}
+          </td>
+          <td data-label="Status">
+            {% if log.status == 'Success' %}
+              <span class="badge badge-success-soft">Success</span>
+            {% elif log.status == 'Failed' %}
+              <span class="badge badge-danger-soft">Failed</span>
+            {% else %}
+              <span class="badge badge-warning-soft">{{ log.status }}</span>
+            {% endif %}
+          </td>
+          <td data-label="Pulled">{{ log.records_pulled }}</td>
+          <td data-label="Pushed">{{ log.records_pushed }}</td>
+          <td data-label="Skipped">{{ log.records_skipped }}</td>
+          <td data-label="Message" style="font-size:0.8rem; color:#8b949e">{{ log.message or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="text-center py-5" style="color:#8b949e">No logs for this device yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

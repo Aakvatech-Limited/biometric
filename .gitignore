@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+*.pyc
+.env
+
+# runtime state — contains API credentials, never commit
+config.json
+local_config.py
+local_config.py.bak
+
+# logs
+*.log
+logs/
