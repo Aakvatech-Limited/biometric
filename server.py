@@ -16,6 +16,11 @@ from app.scheduler import start_scheduler
 IS_BACKGROUND = os.environ.get("BIOMETRIC_SYNC_SERVICE_MODE") == "background"
 PORT = int(os.environ.get("BIOMETRIC_PORT", 5050))
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
 # Suppress noisy werkzeug request logs when running as a background service
 if IS_BACKGROUND:
     logging.getLogger("werkzeug").setLevel(logging.WARNING)

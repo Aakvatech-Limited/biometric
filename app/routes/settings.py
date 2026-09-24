@@ -9,6 +9,7 @@ settings_bp = Blueprint("settings", __name__)
 def index():
     if request.method == "POST":
         raw_date = request.form.get("import_start_date", "").strip()
+        was_enabled = store.get_settings().enable_auto_sync
         settings = store.save_settings(
             erpnext_url=request.form.get("erpnext_url", "").rstrip("/"),
             api_key=request.form.get("api_key", ""),
@@ -24,14 +25,26 @@ def index():
             biotime_password=request.form.get("biotime_password", ""),
         )
 
-        # Reschedule if interval changed
+        # Apply the new interval; sync right away if auto sync was just enabled
         try:
             from app.scheduler import reschedule
-            reschedule(current_app._get_current_object(), settings.sync_interval)
+            reschedule(
+                current_app._get_current_object(),
+                settings.sync_interval,
+                run_now=settings.enable_auto_sync and not was_enabled,
+            )
         except Exception:
-            pass
+            current_app.logger.exception("Failed to reschedule auto sync")
+            flash("Settings saved, but the auto sync schedule could not be updated. "
+                  "Restart the app to apply it.", "warning")
+            return redirect(url_for("settings.index"))
 
         flash("Settings saved.", "success")
+        if settings.enable_auto_sync and not was_enabled:
+            flash(f"Auto sync enabled. First sync started now, then every "
+                  f"{settings.sync_interval} min.", "info")
+        elif was_enabled and not settings.enable_auto_sync:
+            flash("Auto sync disabled. Devices will only sync when you click Sync.", "info")
         return redirect(url_for("settings.index"))
     return render_template("settings.html", settings=store.get_settings())
 
