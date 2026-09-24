@@ -12,6 +12,29 @@
   </button>
 </div>
 
+<!-- Auto sync status -->
+{% if settings.enable_auto_sync and auto_sync.running %}
+<div class="alert alert-success d-flex flex-wrap align-items-center gap-3 mb-4" role="status">
+  <span><i class="bi bi-arrow-repeat me-1"></i><strong>Auto Sync ON</strong> · every {{ settings.sync_interval }} min</span>
+  <span style="font-size:0.85rem">
+    Last run: {{ auto_sync.last_run_at.strftime('%d %b %Y %H:%M') if auto_sync.last_run_at else '—' }}
+  </span>
+  <span style="font-size:0.85rem">
+    Next run: {{ auto_sync.next_run_at.strftime('%d %b %Y %H:%M') if auto_sync.next_run_at else '—' }}
+  </span>
+</div>
+{% elif settings.enable_auto_sync %}
+<div class="alert alert-warning mb-4" role="status">
+  <i class="bi bi-exclamation-triangle me-1"></i><strong>Auto Sync is enabled but the scheduler is not running.</strong>
+  Restart the app to start it.
+</div>
+{% else %}
+<div class="alert alert-secondary d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4" role="status">
+  <span><i class="bi bi-pause-circle me-1"></i><strong>Auto Sync OFF</strong> · devices only sync when you click Sync.</span>
+  <a href="{{ url_for('settings.index') }}" class="btn btn-sm btn-outline-secondary">Turn on in Settings</a>
+</div>
+{% endif %}
+
 <!-- Stats row -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">

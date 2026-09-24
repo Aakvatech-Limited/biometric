@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template
 from app import store
+from app.scheduler import get_status as scheduler_status
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -23,4 +24,5 @@ def index():
         recent_logs=recent_logs,
         settings=store.get_settings(),
         stats=stats,
+        auto_sync=scheduler_status(),
     )
