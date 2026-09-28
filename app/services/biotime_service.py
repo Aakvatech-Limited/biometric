@@ -35,6 +35,13 @@ PUNCH_STATE_MAP = {
 }
 
 
+def _punch_from_state(state):
+    """Map a BioTime punch_state to a punch type; None when it is missing."""
+    if state is None or str(state).strip() == "":
+        return None
+    return PUNCH_STATE_MAP.get(str(state).strip(), "AUTO")
+
+
 def _friendly_error(e: Exception) -> str:
     if isinstance(e, requests.exceptions.ConnectionError):
         return (
@@ -113,7 +120,7 @@ def pull_transactions(base_url: str, username: str, password: str,
                 records.append({
                     "user_id": str(row.get("emp_code", "")),
                     "timestamp": ts,
-                    "punch": PUNCH_STATE_MAP.get(str(row.get("punch_state", "")), "AUTO"),
+                    "punch": _punch_from_state(row.get("punch_state")),
                     "status": row.get("punch_state"),
                 })
 

@@ -39,7 +39,7 @@ def pull_attendance(ip: str, port: int = 4370, timeout: int = 10):
             records.append({
                 "user_id": str(att.user_id),
                 "timestamp": att.timestamp,
-                "punch": PUNCH_MAP.get(att.punch, "AUTO"),
+                "punch": None if att.punch is None else PUNCH_MAP.get(att.punch, "AUTO"),
                 "status": att.status,
             })
 
