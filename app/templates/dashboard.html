@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — Biometric Sync{% endblock %}
 
+{% block live_refresh %}1{% endblock %}
+
 {% block content %}
 <div class="page-header d-flex align-items-start justify-content-between">
   <div>
@@ -95,7 +97,7 @@
           <td data-label="Last Synced" style="font-size:0.8rem; color:#8b949e">
             {{ device.last_synced_at.strftime('%d %b %Y %H:%M') if device.last_synced_at else '—' }}
           </td>
-          <td data-label="Status">
+          <td data-label="Status" data-sync-status="{{ device.id }}">
             {% set status = device.last_sync_status %}
             {% if status == 'Success' %}
               <span class="badge badge-success-soft">Success</span>
@@ -202,6 +204,7 @@ function showToast(msg, success) {
 
 async function syncDevice(deviceId, name) {
   const btn = document.getElementById(`syncBtn-${deviceId}`);
+  window.syncBusy = true;
   btn.disabled = true;
   btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Syncing…';
   try {
@@ -224,6 +227,7 @@ async function syncDevice(deviceId, name) {
 
 async function syncAll() {
   const btn = document.getElementById('syncAllBtn');
+  window.syncBusy = true;
   btn.disabled = true;
   btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Syncing…';
   try {

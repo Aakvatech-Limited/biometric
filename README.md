@@ -89,6 +89,20 @@ restart; the permanent record is `biometric_sync.log`.
 > `local_config.py` into `config.json` and keeps the old file as
 > `local_config.py.bak`.
 
+## Updates
+
+When installed from a git clone, the app checks
+[Aakvatech-Limited/biometric](https://github.com/Aakvatech-Limited/biometric)
+(`main`) on startup and every 6 hours. If new commits exist, a popup lists
+them with an **Update now** button, which fast-forwards the clone, reinstalls
+dependencies when `requirements.txt` changed, and restarts the app. Settings
+(`config.json`, `.env`) are untouched. **Later** hides the popup until a newer
+commit lands; the sidebar badge and **Settings → App Updates** stay available.
+
+The update is refused (nothing changes) while a sync is running, when tracked
+files have local edits, or when the clone has its own commits — update those
+installs manually with `git pull`. Zip installs don't show the popup.
+
 ## Project Structure
 
 ```

@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 scheduler = BackgroundScheduler()
 _job_id = "biometric_auto_sync"
+_update_job_id = "biometric_update_check"
 _last_run_at = None   # when the scheduler last ran a sync (in-memory)
 
 
@@ -41,6 +42,14 @@ def start_scheduler(app):
         id=_job_id,
         replace_existing=True,
         # Run once immediately on startup instead of waiting a full interval
+        next_run_time=datetime.now(),
+    )
+    from app.services.updater import check_for_updates
+    scheduler.add_job(
+        func=check_for_updates,
+        trigger=IntervalTrigger(hours=6),
+        id=_update_job_id,
+        replace_existing=True,
         next_run_time=datetime.now(),
     )
     scheduler.start()
