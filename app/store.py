@@ -340,6 +340,12 @@ def add_log(device_id, status, records_pulled=0, records_pushed=0,
         return entry
 
 
+def latest_log_id() -> int:
+    """Id of the newest log entry (0 if none) — lets pages detect new syncs."""
+    with _lock:
+        return _next_log_id - 1
+
+
 def get_logs(device_id=None, limit=20) -> list:
     """Recent log entries, newest first."""
     with _lock:

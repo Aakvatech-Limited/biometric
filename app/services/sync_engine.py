@@ -6,6 +6,7 @@ No local record of synced data is kept — ERPNext is the source of truth
 safely.  Run history is recorded via the in-memory log in ``app.store``.
 """
 import logging
+import threading
 
 from app import store
 from app.services.zk_service import pull_attendance
@@ -14,12 +15,31 @@ from app.services.erpnext_service import ERPNextClient
 
 logger = logging.getLogger(__name__)
 
+_in_progress_lock = threading.Lock()
+_in_progress: dict = {}   # {device record id: device name} currently syncing
+
+
+def get_in_progress() -> dict:
+    """Devices with a sync currently running (manual or scheduled)."""
+    with _in_progress_lock:
+        return dict(_in_progress)
+
 
 def sync_device(device: store.Device) -> store.LogEntry:
     """
     Run a full sync cycle for a single device.
     Returns the LogEntry created.
     """
+    with _in_progress_lock:
+        _in_progress[device.id] = device.name
+    try:
+        return _sync_device(device)
+    finally:
+        with _in_progress_lock:
+            _in_progress.pop(device.id, None)
+
+
+def _sync_device(device: store.Device) -> store.LogEntry:
     settings = store.get_settings()
 
     # Validate settings
@@ -73,6 +93,11 @@ def sync_device(device: store.Device) -> store.LogEntry:
             records = [r for r in records if r["timestamp"].date() >= settings.import_start_date]
             pulled = len(records)
 
+        # Ignore logs the device recorded without any punch type
+        with_punch = [r for r in records if r["punch"]]
+        skipped = len(records) - len(with_punch)
+        records = with_punch
+
         client = ERPNextClient(settings.erpnext_url, settings.api_key, settings.api_secret)
 
         if settings.enable_staging:
@@ -87,6 +112,8 @@ def sync_device(device: store.Device) -> store.LogEntry:
 
             status = "Success"
             message = f"Pulled {pulled}, sent {pushed} to Biometric Data Staging."
+            if skipped:
+                message += f" Skipped {skipped} (no punch type)."
 
         else:
             # 2b. Staging disabled: push Employee Checkins directly, as before.

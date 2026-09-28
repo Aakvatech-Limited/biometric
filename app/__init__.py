@@ -20,4 +20,9 @@ def create_app(config_class=Config):
     app.register_blueprint(settings_bp, url_prefix="/settings")
     app.register_blueprint(api_bp, url_prefix="/api")
 
+    @app.context_processor
+    def _inject_last_log_id():
+        # Baseline for the live-refresh poller in base.html
+        return {"last_log_id": store.latest_log_id()}
+
     return app

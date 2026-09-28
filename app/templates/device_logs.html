@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Logs — {{ device.name }}{% endblock %}
 
+{% block live_refresh %}1{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <a href="{{ url_for('devices.index') }}" style="color:#8b949e; font-size:0.8rem; text-decoration:none">

@@ -52,6 +52,19 @@ def test_device(device_id):
     return jsonify(result)
 
 
+@api_bp.route("/sync-state")
+def sync_state():
+    """Polled by the UI to show running syncs and refresh when new logs land."""
+    from app.services.sync_engine import get_in_progress
+    from app.scheduler import get_status as scheduler_status
+    syncing = get_in_progress()
+    return jsonify({
+        "syncing": [{"id": i, "name": n} for i, n in syncing.items()],
+        "last_log_id": store.latest_log_id(),
+        "scheduler_running": scheduler_status()["running"],
+    })
+
+
 @api_bp.route("/logs/recent")
 def recent_logs():
     return jsonify([l.to_dict() for l in store.get_logs(limit=20)])
@@ -137,6 +150,35 @@ def service_info():
     status = service_manager.get_service_status()
     status["background_mode"] = IS_BACKGROUND
     return jsonify(status)
+
+
+@api_bp.route("/update/status")
+def update_status():
+    from app.services.updater import get_status
+    return jsonify(get_status())
+
+
+@api_bp.route("/update/check", methods=["POST"])
+def update_check():
+    from app.services.updater import check_for_updates
+    return jsonify(check_for_updates())
+
+
+@api_bp.route("/update/apply", methods=["POST"])
+def update_apply():
+    """Pull the latest official code, then restart this process."""
+    from app.services.updater import apply_update, restart_app
+
+    try:
+        result = apply_update()
+    except Exception as exc:
+        logger.exception("Update failed.")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+    if result.get("success"):
+        restart_app()
+        return jsonify({**result, "restarting": True})
+    return jsonify(result), 409 if result.get("refused") else 500
 
 
 @api_bp.route("/shift-types")
