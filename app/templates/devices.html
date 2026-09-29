@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Devices — Biometric Sync{% endblock %}
+{% block live_refresh %}1{% endblock %}
 
 {% block content %}
 <div class="page-header d-flex align-items-start justify-content-between">
@@ -55,7 +56,7 @@
             {% endif %}
           </td>
           <td data-label="Last Synced" style="font-size:0.8rem; color:#8b949e">
-            {{ device.last_synced_at.strftime('%d %b %Y %H:%M') if device.last_synced_at else '—' }}
+            {% if device.last_synced_at %}<span data-utc-datetime="{{ device.last_synced_at.isoformat() }}Z" data-include-year="true">{{ device.last_synced_at.strftime('%d %b %Y %H:%M') }} UTC</span>{% else %}—{% endif %}
           </td>
           <td data-label="Status">
             {% set status = device.last_sync_status %}
@@ -71,7 +72,7 @@
           </td>
           <td class="td-actions">
             <div class="d-flex gap-1 flex-wrap">
-              <button class="btn-sync" id="syncBtn-{{ device.id }}"
+              <button class="btn-sync" id="syncBtn-{{ device.id }}" data-sync-device-id="{{ device.id }}"
                 onclick="syncDevice({{ device.id }}, '{{ device.name }}')" title="Sync">
                 <i class="bi bi-arrow-repeat"></i>
               </button>
@@ -132,6 +133,7 @@ function showToast(msg, ok) {
 }
 
 async function syncDevice(id, name) {
+  window.syncBusy = true;
   const btn = document.getElementById(`syncBtn-${id}`);
   btn.disabled = true;
   btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
