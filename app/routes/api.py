@@ -46,6 +46,18 @@ def test_device(device_id):
     if settings.attendance_source == "biotime":
         from app.services.biotime_service import test_connection
         result = test_connection(settings.biotime_url, settings.biotime_username, settings.biotime_password)
+    elif settings.attendance_source == "adms":
+        from app.services import adms_service
+        seen = adms_service.last_seen(device.terminal_sn) if device.terminal_sn else None
+        if seen:
+            pending = len(adms_service.pending_records(device.terminal_sn))
+            result = {"success": True, "device_info": None,
+                      "message": f"Device last contacted the app at {seen:%H:%M:%S}; "
+                                 f"{pending} punch(es) waiting to sync."}
+        else:
+            result = {"success": False, "device_info": None,
+                      "message": "Device has not contacted the app since it started. Check its "
+                                 "Cloud Server Setting points to this PC and port."}
     else:
         from app.services.zk_service import test_connection
         result = test_connection(device.ip_address, device.port)

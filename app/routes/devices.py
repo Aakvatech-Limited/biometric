@@ -30,8 +30,10 @@ def _get_device_or_404(device_id: int):
 
 @devices_bp.route("/")
 def index():
+    from app.services.adms_service import unknown_devices
     return render_template("devices.html", devices=store.get_devices(),
-                           attendance_source=store.get_settings().attendance_source)
+                           attendance_source=store.get_settings().attendance_source,
+                           unknown_devices=unknown_devices())
 
 
 @devices_bp.route("/new", methods=["GET", "POST"])

@@ -35,7 +35,7 @@ DEFAULT_SETTINGS = {
     "enable_auto_sync": False,
     "import_start_date": None,   # ISO date string or None
     "enable_staging": False,
-    "attendance_source": "direct",   # "direct" (pyzk) or "biotime" (BioTime REST API)
+    "attendance_source": "direct",   # "direct" (pyzk), "biotime" (BioTime REST API) or "adms" (device push)
     "biotime_url": "",
     "biotime_username": "",
     "biotime_password": "",

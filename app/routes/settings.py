@@ -1,8 +1,19 @@
+import socket
 from datetime import date
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from app import store
 
 settings_bp = Blueprint("settings", __name__)
+
+
+def _lan_ip() -> str:
+    """This PC's LAN address (what a device should use as its ADMS server)."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("10.255.255.255", 1))   # no packet is sent for UDP connect
+            return s.getsockname()[0]
+    except OSError:
+        return "this PC's IP address"
 
 
 @settings_bp.route("/", methods=["GET", "POST"])
@@ -46,7 +57,7 @@ def index():
         elif was_enabled and not settings.enable_auto_sync:
             flash("Auto sync disabled. Devices will only sync when you click Sync.", "info")
         return redirect(url_for("settings.index"))
-    return render_template("settings.html", settings=store.get_settings())
+    return render_template("settings.html", settings=store.get_settings(), lan_ip=_lan_ip())
 
 
 @settings_bp.route("/test-connection", methods=["POST"])

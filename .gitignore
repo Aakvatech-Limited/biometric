@@ -8,6 +8,10 @@ config.json
 local_config.py
 local_config.py.bak
 
+# pushed punches waiting to be synced to ERPNext
+adms_queue.json
+adms_queue.json.tmp
+
 # logs
 *.log
 logs/
