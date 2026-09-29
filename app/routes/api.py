@@ -52,6 +52,20 @@ def test_device(device_id):
     return jsonify(result)
 
 
+@api_bp.route("/sync-state")
+def sync_state():
+    """Return lightweight live sync state for UI polling."""
+    from app.scheduler import get_status as scheduler_status
+    from app.services.sync_engine import get_in_progress
+
+    syncing = get_in_progress()
+    return jsonify({
+        "syncing": [{"id": device_id, "name": name} for device_id, name in syncing.items()],
+        "last_log_id": store.latest_log_id(),
+        "scheduler_running": scheduler_status()["running"],
+    })
+
+
 @api_bp.route("/logs/recent")
 def recent_logs():
     return jsonify([l.to_dict() for l in store.get_logs(limit=20)])
