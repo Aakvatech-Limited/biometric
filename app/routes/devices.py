@@ -8,6 +8,19 @@ def _parse_shift_types(raw: str):
     return [s.strip() for s in raw.split(",") if s.strip()]
 
 
+def _parse_optional_coordinate(raw: str, label: str, minimum: float, maximum: float):
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        raise ValueError(f"{label} must be a number.")
+    if not minimum <= value <= maximum:
+        raise ValueError(f"{label} must be between {minimum} and {maximum}.")
+    return value
+
+
 def _get_device_or_404(device_id: int):
     device = store.get_device(device_id)
     if device is None:
@@ -24,6 +37,13 @@ def index():
 @devices_bp.route("/new", methods=["GET", "POST"])
 def new():
     if request.method == "POST":
+        try:
+            latitude = _parse_optional_coordinate(request.form.get("latitude"), "Latitude", -90, 90)
+            longitude = _parse_optional_coordinate(request.form.get("longitude"), "Longitude", -180, 180)
+        except ValueError as exc:
+            flash(str(exc), "danger")
+            return render_template("device_form.html", device=None, selected_shift_types=_parse_shift_types(request.form.get("shift_types", "")),
+                                   attendance_source=store.get_settings().attendance_source)
         device = store.add_device(
             name=request.form["name"],
             device_id=int(request.form.get("device_id", 1)),
@@ -33,6 +53,8 @@ def new():
             punch_direction=request.form.get("punch_direction", "AUTO"),
             is_active=bool(request.form.get("is_active")),
             shift_types=_parse_shift_types(request.form.get("shift_types", "")),
+            latitude=latitude,
+            longitude=longitude,
         )
         flash(f'Device "{device.name}" added.', "success")
         return redirect(url_for("devices.index"))
@@ -44,6 +66,14 @@ def new():
 def edit(device_id):
     device = _get_device_or_404(device_id)
     if request.method == "POST":
+        try:
+            latitude = _parse_optional_coordinate(request.form.get("latitude"), "Latitude", -90, 90)
+            longitude = _parse_optional_coordinate(request.form.get("longitude"), "Longitude", -180, 180)
+        except ValueError as exc:
+            flash(str(exc), "danger")
+            return render_template("device_form.html", device=device,
+                                   selected_shift_types=_parse_shift_types(request.form.get("shift_types", "")),
+                                   attendance_source=store.get_settings().attendance_source)
         device = store.update_device(
             device_id,
             name=request.form["name"],
@@ -54,6 +84,8 @@ def edit(device_id):
             punch_direction=request.form.get("punch_direction", "AUTO"),
             is_active=bool(request.form.get("is_active")),
             shift_types=_parse_shift_types(request.form.get("shift_types", "")),
+            latitude=latitude,
+            longitude=longitude,
         )
         flash(f'Device "{device.name}" updated.', "success")
         return redirect(url_for("devices.index"))

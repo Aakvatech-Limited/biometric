@@ -76,7 +76,8 @@ class ERPNextClient:
         except Exception:
             return False
 
-    def create_checkin(self, employee: str, timestamp: str, log_type: str = "AUTO", device_id: str = ""):
+    def create_checkin(self, employee: str, timestamp: str, log_type: str = "AUTO", device_id: str = "",
+                       latitude=None, longitude=None):
         """
         Create an Employee Checkin record in ERPNext.
 
@@ -88,22 +89,31 @@ class ERPNextClient:
             "log_type": log_type if log_type in ("IN", "OUT") else "IN",
             "device_id": device_id,
         }
+        if latitude is not None:
+            data["latitude"] = latitude
+        if longitude is not None:
+            data["longitude"] = longitude
         return self._post("/api/resource/Employee Checkin", data)
 
-    def push_to_staging(self, records: list, device_id: str = ""):
+    def push_to_staging(self, records: list, device_id: str = "", latitude=None, longitude=None):
         """
         Push raw attendance records to biometric_client Biometric Data Staging.
         records: list of dicts with keys user_id, timestamp (datetime), punch (str)
         """
         payload = []
         for rec in records:
-            payload.append({
+            row = {
                 "attendance_device_id": str(rec["user_id"]),
                 "timestamp": rec["timestamp"].strftime("%Y-%m-%d %H:%M:%S"),
                 "punch_type": rec["punch"] if rec["punch"] in ("IN", "OUT") else "AUTO",
                 "device_id": device_id,
                 "status": "Pending",
-            })
+            }
+            if latitude is not None:
+                row["latitude"] = latitude
+            if longitude is not None:
+                row["longitude"] = longitude
+            payload.append(row)
         result = self._post(
             "/api/method/biometric_client.biometric_client.api.upload_bulk_biometric_data",
             payload,

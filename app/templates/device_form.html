@@ -62,6 +62,23 @@
               value="{{ device.ip_address if device else '' }}">
           </div>
           {% endif %}
+          <div class="row g-3 mb-3">
+            <div class="col">
+              <label class="form-label text-muted" style="font-size:0.8rem">Latitude</label>
+              <input type="number" step="any" min="-90" max="90" name="latitude" class="form-control"
+                placeholder="-6.7924"
+                value="{{ device.latitude if device and device.latitude is not none else request.form.get('latitude', '') }}">
+            </div>
+            <div class="col">
+              <label class="form-label text-muted" style="font-size:0.8rem">Longitude</label>
+              <input type="number" step="any" min="-180" max="180" name="longitude" class="form-control"
+                placeholder="39.2083"
+                value="{{ device.longitude if device and device.longitude is not none else request.form.get('longitude', '') }}">
+            </div>
+            <div class="form-text" style="font-size:0.75rem">
+              Optional fixed location of this biometric terminal. Leave blank if unknown.
+            </div>
+          </div>
           <div class="mb-3">
             <label class="form-label text-muted" style="font-size:0.8rem">Punch Direction</label>
             <select name="punch_direction" class="form-select">

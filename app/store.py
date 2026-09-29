@@ -103,6 +103,8 @@ class Device:
         self.punch_direction = raw.get("punch_direction", "AUTO")
         self.is_active = bool(raw.get("is_active", True))
         self.shift_types = list(raw.get("shift_types", []))
+        self.latitude = raw.get("latitude")
+        self.longitude = raw.get("longitude")
         self.last_synced_at = _parse_dt(raw.get("last_synced_at"))
         self.created_at = _parse_dt(raw.get("created_at"))
 
@@ -123,6 +125,8 @@ class Device:
             "terminal_sn": self.terminal_sn,
             "punch_direction": self.punch_direction,
             "is_active": self.is_active,
+            "latitude": self.latitude,
+            "longitude": self.longitude,
             "last_synced_at": self.last_synced_at.isoformat() if self.last_synced_at else None,
             "last_sync_status": self.last_sync_status,
         }
@@ -255,7 +259,7 @@ def get_device(device_id: int):
 
 
 def add_device(name, device_id, ip_address, port, punch_direction,
-               is_active, shift_types, terminal_sn="") -> Device:
+               is_active, shift_types, terminal_sn="", latitude=None, longitude=None) -> Device:
     with _lock:
         _ensure_loaded()
         new_id = _data["next_device_id"]
@@ -270,6 +274,8 @@ def add_device(name, device_id, ip_address, port, punch_direction,
             "punch_direction": punch_direction,
             "is_active": bool(is_active),
             "shift_types": list(shift_types),
+            "latitude": latitude,
+            "longitude": longitude,
             "last_synced_at": None,
             "created_at": datetime.utcnow().isoformat(),
         }
@@ -286,7 +292,7 @@ def update_device(record_id: int, **fields):
         for d in _data["devices"]:
             if d["id"] == record_id:
                 for key in ("name", "device_id", "ip_address", "port", "terminal_sn",
-                            "punch_direction", "is_active", "shift_types"):
+                            "punch_direction", "is_active", "shift_types", "latitude", "longitude"):
                     if key in fields:
                         d[key] = fields[key]
                 _save()
@@ -410,6 +416,8 @@ def _migrate_from_local_config() -> None:
                 "punch_direction": dev.get("punch_direction") or "AUTO",
                 "is_active": True,
                 "shift_types": shift_types,
+                "latitude": dev.get("latitude"),
+                "longitude": dev.get("longitude"),
                 "last_synced_at": None,
                 "created_at": datetime.utcnow().isoformat(),
             })
