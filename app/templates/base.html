@@ -223,9 +223,10 @@
   </nav>
   <div class="p-3" style="border-top:1px solid var(--sidebar-border)">
     <div class="d-flex align-items-center gap-2">
-      <span class="status-dot online"></span>
-      <span style="font-size:0.75rem; color:#8b949e;">Scheduler running</span>
+      <span class="status-dot unknown" id="schedulerStatusDot"></span>
+      <span style="font-size:0.75rem; color:#8b949e;" id="schedulerStatusText">Checking scheduler…</span>
     </div>
+    <div id="syncingStatusText" class="mt-1" style="font-size:0.7rem; color:#8b949e;"></div>
   </div>
 </div>
 
@@ -256,6 +257,102 @@ function closeSidebar() {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('show');
 }
+
+function formatLocalDateTimes() {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local time';
+
+  document.querySelectorAll('[data-utc-datetime]').forEach((el) => {
+    const value = el.dataset.utcDatetime;
+    if (!value) return;
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return;
+
+    const options = {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    };
+    if (el.dataset.includeYear === 'true') options.year = 'numeric';
+    if (el.dataset.includeSeconds === 'true') options.second = '2-digit';
+
+    el.textContent = new Intl.DateTimeFormat(undefined, options).format(date);
+    el.title = timezone;
+  });
+
+  document.querySelectorAll('[data-local-timezone]').forEach((el) => {
+    el.textContent = timezone;
+  });
+}
+
+const liveRefreshEnabled = Boolean(Number("{% block live_refresh %}0{% endblock %}"));
+let latestLogId = Number({{ last_log_id|default(0) }});
+window.syncBusy = false;
+
+function renderSyncState(state) {
+  const dot = document.getElementById('schedulerStatusDot');
+  const text = document.getElementById('schedulerStatusText');
+  const syncingText = document.getElementById('syncingStatusText');
+
+  if (dot && text) {
+    dot.classList.toggle('online', Boolean(state.scheduler_running));
+    dot.classList.toggle('offline', !state.scheduler_running);
+    dot.classList.remove('unknown');
+    text.textContent = state.scheduler_running ? 'Scheduler running' : 'Scheduler stopped';
+  }
+
+  if (syncingText) {
+    if (state.syncing?.length) {
+      syncingText.textContent = 'Syncing: ' + state.syncing.map((d) => d.name).join(', ');
+    } else {
+      syncingText.textContent = '';
+    }
+  }
+
+  document.querySelectorAll('[data-sync-device-id]').forEach((el) => {
+    const id = Number(el.dataset.syncDeviceId);
+    const running = state.syncing?.some((d) => Number(d.id) === id);
+    if (running) {
+      el.disabled = true;
+      el.innerHTML = '<i class="bi bi-hourglass-split"></i> Syncing…';
+    } else if (!window.syncBusy) {
+      el.disabled = false;
+      el.innerHTML = el.dataset.idleHtml || '<i class="bi bi-arrow-repeat"></i>';
+    }
+  });
+}
+
+async function pollSyncState() {
+  if (document.visibilityState !== 'visible') return;
+
+  try {
+    const response = await fetch('/api/sync-state', { cache: 'no-store' });
+    if (!response.ok) return;
+
+    const state = await response.json();
+    renderSyncState(state);
+
+    const newLogId = Number(state.last_log_id || 0);
+    if (liveRefreshEnabled && !window.syncBusy && newLogId !== latestLogId) {
+      window.location.reload();
+      return;
+    }
+    latestLogId = newLogId;
+  } catch (error) {
+    // A transient polling failure should not disrupt normal page use.
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('[data-sync-device-id]').forEach((el) => {
+    el.dataset.idleHtml = el.innerHTML;
+  });
+  formatLocalDateTimes();
+  pollSyncState();
+  window.setInterval(pollSyncState, 5000);
+});
 </script>
 {% block scripts %}{% endblock %}
 </body>
