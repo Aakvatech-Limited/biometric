@@ -10,6 +10,7 @@ import logging
 from app import store
 from app.services.zk_service import pull_attendance
 from app.services.biotime_service import pull_transactions
+from app.services import adms_service
 from app.services.erpnext_service import ERPNextClient
 
 logger = logging.getLogger(__name__)
@@ -44,17 +45,29 @@ def sync_device(device: store.Device) -> store.LogEntry:
                 message="This device has no Terminal Serial Number set — required in BioTime mode.",
             )
 
+    if settings.attendance_source == "adms" and not device.terminal_sn:
+        return store.add_log(
+            device.id,
+            status="Failed",
+            message="This device has no Terminal Serial Number set — required in Push (ADMS) mode.",
+        )
+
     pulled = 0
     pushed = 0
     skipped = 0
+    queued = 0   # ADMS punches consumed from the queue (acked only on success)
 
     try:
-        # 1. Pull attendance records — from BioTime, or directly from the device
+        # 1. Pull attendance records — from BioTime, the ADMS push queue,
+        #    or directly from the device
         if settings.attendance_source == "biotime":
             records = pull_transactions(
                 settings.biotime_url, settings.biotime_username, settings.biotime_password,
                 terminal_sn=device.terminal_sn, since=device.last_synced_at,
             )
+        elif settings.attendance_source == "adms":
+            records = adms_service.pending_records(device.terminal_sn)
+            queued = len(records)
         else:
             records = pull_attendance(device.ip_address, port=device.port)
         pulled = len(records)
@@ -65,7 +78,7 @@ def sync_device(device: store.Device) -> store.LogEntry:
                 device.id,
                 status="No Data",
                 records_pulled=0,
-                message="Device connected but returned no attendance records.",
+                message=_no_data_message(settings.attendance_source, device),
             )
 
         # Filter by import_start_date if set
@@ -130,6 +143,9 @@ def sync_device(device: store.Device) -> store.LogEntry:
         status = "Failed"
         message = str(e)
 
+    if status == "Success" and queued:
+        adms_service.ack(device.terminal_sn, queued)
+
     store.touch_device_sync(device.id)
     return store.add_log(
         device.id,
@@ -150,6 +166,16 @@ def sync_all_devices():
         result = sync_device(device)
         results.append(result)
     return results
+
+
+def _no_data_message(source: str, device: store.Device) -> str:
+    if source != "adms":
+        return "Device connected but returned no attendance records."
+    seen = adms_service.last_seen(device.terminal_sn)
+    if seen is None:
+        return ("No punches received. The device has not contacted the app since it "
+                "started — check its Cloud Server Setting points to this PC.")
+    return f"No new punches received. Device last contacted the app at {seen:%H:%M:%S}."
 
 
 def _resolve_log_type(punch: str, device_direction: str) -> str:

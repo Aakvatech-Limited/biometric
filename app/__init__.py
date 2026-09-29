@@ -14,10 +14,12 @@ def create_app(config_class=Config):
     from app.routes.devices import devices_bp
     from app.routes.settings import settings_bp
     from app.routes.api import api_bp
+    from app.routes.iclock import iclock_bp
 
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(devices_bp, url_prefix="/devices")
     app.register_blueprint(settings_bp, url_prefix="/settings")
     app.register_blueprint(api_bp, url_prefix="/api")
+    app.register_blueprint(iclock_bp, url_prefix="/iclock")
 
     return app
