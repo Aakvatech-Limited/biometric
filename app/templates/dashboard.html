@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — Biometric Sync{% endblock %}
+{% block live_refresh %}1{% endblock %}
 
 {% block content %}
 <div class="page-header d-flex align-items-start justify-content-between">
@@ -93,7 +94,7 @@
           <td data-label="IP"><code style="color:#79c0ff">{{ device.ip_address }}:{{ device.port }}</code></td>
           <td data-label="Direction"><span class="badge badge-muted-soft">{{ device.punch_direction }}</span></td>
           <td data-label="Last Synced" style="font-size:0.8rem; color:#8b949e">
-            {{ device.last_synced_at.strftime('%d %b %Y %H:%M') if device.last_synced_at else '—' }}
+            {% if device.last_synced_at %}<span data-utc-datetime="{{ device.last_synced_at.isoformat() }}Z" data-include-year="true">{{ device.last_synced_at.strftime('%d %b %Y %H:%M') }} UTC</span>{% else %}—{% endif %}
           </td>
           <td data-label="Status">
             {% set status = device.last_sync_status %}
@@ -108,7 +109,7 @@
             {% endif %}
           </td>
           <td class="td-actions">
-            <button class="btn-sync" id="syncBtn-{{ device.id }}" onclick="syncDevice({{ device.id }}, '{{ device.name }}')">
+            <button class="btn-sync" id="syncBtn-{{ device.id }}" data-sync-device-id="{{ device.id }}" onclick="syncDevice({{ device.id }}, '{{ device.name }}')">
               <i class="bi bi-arrow-repeat"></i> Sync
             </button>
             <a href="{{ url_for('devices.logs', device_id=device.id) }}" class="btn btn-sm btn-outline-secondary ms-1">
@@ -130,7 +131,10 @@
 
 <!-- Recent Logs -->
 <div class="card">
-  <div class="card-header"><i class="bi bi-journal-code me-2"></i>Recent Sync Logs</div>
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span><i class="bi bi-journal-code me-2"></i>Recent Sync Logs</span>
+    <small style="color:#8b949e">Times: <span data-local-timezone>local timezone</span> · live refresh</small>
+  </div>
   <div class="table-responsive">
     <table class="table mb-0 card-table">
       <thead>
@@ -148,7 +152,7 @@
         {% for log in recent_logs %}
         <tr>
           <td data-label="Time" style="font-size:0.8rem; color:#8b949e; white-space:nowrap">
-            {{ log.synced_at.strftime('%d %b %H:%M:%S') }}
+            <span data-utc-datetime="{{ log.synced_at.isoformat() }}Z" data-include-seconds="true">{{ log.synced_at.strftime('%d %b %H:%M:%S') }} UTC</span>
           </td>
           <td data-label="Device" style="font-size:0.875rem">{{ log.device_name }}</td>
           <td data-label="Status">
@@ -201,6 +205,7 @@ function showToast(msg, success) {
 }
 
 async function syncDevice(deviceId, name) {
+  window.syncBusy = true;
   const btn = document.getElementById(`syncBtn-${deviceId}`);
   btn.disabled = true;
   btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Syncing…';
@@ -223,6 +228,7 @@ async function syncDevice(deviceId, name) {
 }
 
 async function syncAll() {
+  window.syncBusy = true;
   const btn = document.getElementById('syncAllBtn');
   btn.disabled = true;
   btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Syncing…';
