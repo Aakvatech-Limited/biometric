@@ -256,6 +256,45 @@ function closeSidebar() {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('show');
 }
+
+function formatLocalDateTimes() {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local time';
+  document.querySelectorAll('[data-utc-datetime]').forEach((el) => {
+    const value = el.dataset.utcDatetime;
+    if (!value) return;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return;
+
+    const includeYear = el.dataset.includeYear === 'true';
+    const includeSeconds = el.dataset.includeSeconds === 'true';
+    const options = {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    };
+    if (includeYear) options.year = 'numeric';
+    if (includeSeconds) options.second = '2-digit';
+
+    el.textContent = new Intl.DateTimeFormat(undefined, options).format(date);
+    el.title = timezone;
+  });
+
+  document.querySelectorAll('[data-local-timezone]').forEach((el) => {
+    el.textContent = timezone;
+  });
+}
+
+function startAutoRefresh(intervalMs = 15000) {
+  window.setInterval(() => {
+    if (document.visibilityState !== 'visible') return;
+    if (window.biometricSyncInProgress) return;
+    window.location.reload();
+  }, intervalMs);
+}
+
+document.addEventListener('DOMContentLoaded', formatLocalDateTimes);
 </script>
 {% block scripts %}{% endblock %}
 </body>
