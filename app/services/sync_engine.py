@@ -6,6 +6,7 @@ No local record of synced data is kept — ERPNext is the source of truth
 safely.  Run history is recorded via the in-memory log in ``app.store``.
 """
 import logging
+import threading
 
 from app import store
 from app.services.zk_service import pull_attendance
@@ -14,12 +15,31 @@ from app.services.erpnext_service import ERPNextClient
 
 logger = logging.getLogger(__name__)
 
+_in_progress_lock = threading.Lock()
+_in_progress: dict[int, str] = {}
+
+
+def get_in_progress() -> dict:
+    """Return a snapshot of devices currently syncing."""
+    with _in_progress_lock:
+        return dict(_in_progress)
+
 
 def sync_device(device: store.Device) -> store.LogEntry:
     """
     Run a full sync cycle for a single device.
     Returns the LogEntry created.
     """
+    with _in_progress_lock:
+        _in_progress[device.id] = device.name
+    try:
+        return _sync_device(device)
+    finally:
+        with _in_progress_lock:
+            _in_progress.pop(device.id, None)
+
+
+def _sync_device(device: store.Device) -> store.LogEntry:
     settings = store.get_settings()
 
     # Validate settings
