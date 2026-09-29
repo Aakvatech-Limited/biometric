@@ -314,9 +314,13 @@ function renderSyncState(state) {
   document.querySelectorAll('[data-sync-device-id]').forEach((el) => {
     const id = Number(el.dataset.syncDeviceId);
     const running = state.syncing?.some((d) => Number(d.id) === id);
-    if (!running) return;
-    el.disabled = true;
-    el.innerHTML = '<i class="bi bi-hourglass-split"></i> Syncing…';
+    if (running) {
+      el.disabled = true;
+      el.innerHTML = '<i class="bi bi-hourglass-split"></i> Syncing…';
+    } else if (!window.syncBusy) {
+      el.disabled = false;
+      el.innerHTML = '<i class="bi bi-arrow-repeat"></i> Sync';
+    }
   });
 }
 
