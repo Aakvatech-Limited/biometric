@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Logs — {{ device.name }}{% endblock %}
 
+{% block scripts %}
+<script>
+startAutoRefresh(15000);
+</script>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <a href="{{ url_for('devices.index') }}" style="color:#8b949e; font-size:0.8rem; text-decoration:none">
@@ -27,7 +33,7 @@
         {% for log in logs %}
         <tr>
           <td data-label="Time" style="font-size:0.8rem; color:#8b949e; white-space:nowrap">
-            {{ log.synced_at.strftime('%d %b %Y %H:%M:%S') }}
+            <span data-utc-datetime="{{ log.synced_at.isoformat() }}Z" data-include-year="true" data-include-seconds="true">{{ log.synced_at.strftime('%d %b %Y %H:%M:%S') }} UTC</span>
           </td>
           <td data-label="Status">
             {% if log.status == 'Success' %}
