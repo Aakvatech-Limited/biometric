@@ -81,7 +81,12 @@ def sync_device(device: store.Device) -> store.LogEntry:
             #     staging table's hourly job creates them, so doing both
             #     would double-punch every record.
             if records:
-                client.push_to_staging(records, device_id=str(device.device_id))
+                client.push_to_staging(
+                    records,
+                    device_id=str(device.device_id),
+                    latitude=device.latitude,
+                    longitude=device.longitude,
+                )
                 pushed = len(records)
                 logger.info(f"Pushed {pushed} records to Biometric Data Staging")
 
@@ -112,6 +117,8 @@ def sync_device(device: store.Device) -> store.LogEntry:
                     timestamp=ts,
                     log_type=log_type,
                     device_id=str(device.device_id),
+                    latitude=device.latitude,
+                    longitude=device.longitude,
                 )
                 pushed += 1
 
