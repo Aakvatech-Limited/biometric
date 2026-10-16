@@ -14,9 +14,27 @@ into ERPNext Employee Checkin records.
 - **Linux:** double-click `setup_linux.sh` (or run `./setup_linux.sh`)
 - **Windows:** double-click `setup_windows.bat`
 
-The script auto-creates the virtual environment, installs dependencies,
-starts the app, and opens http://localhost:5050 in your browser. No manual
-venv or pip commands needed. Equivalent manual command:
+Nothing needs to be installed first. The script:
+
+1. Installs **Python 3.9+** and **Git** if they are missing
+   - Windows: via `winget`, falling back to the official python.org / Git for
+     Windows installers (per-user, silent)
+   - Linux: via the system package manager (`apt`, `dnf`, `yum`, `zypper`,
+     `pacman` or `apk`) — you'll be asked for your sudo password
+2. Downloads the app (git clone) if the script was run on its own — into
+   `~/biometric-sync` on Linux or `%LOCALAPPDATA%\BiometricSync` on Windows
+   (override with the `BIOMETRIC_HOME` environment variable)
+3. Creates the virtual environment, installs the Python packages, starts the
+   app, and opens http://localhost:5050 in your browser
+
+So the setup script alone is enough to install on a fresh machine. On Linux
+you can also run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Aakvatech-Limited/biometric/main/setup_linux.sh | bash
+```
+
+Equivalent manual command once Python is installed:
 
 ```bash
 python3 run.py    # Windows: python run.py
