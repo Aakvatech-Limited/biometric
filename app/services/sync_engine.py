@@ -8,6 +8,8 @@ safely.  Run history is recorded via the in-memory log in ``app.store``.
 import logging
 import threading
 
+import requests
+
 from app import store
 from app.services.zk_service import pull_attendance
 from app.services.biotime_service import pull_transactions
@@ -80,6 +82,8 @@ def _sync_device(device: store.Device) -> store.LogEntry:
     pulled = 0
     pushed = 0
     skipped = 0
+    failed = 0   # records ERPNext rejected (validation errors)
+    errors = []
     queued = 0   # ADMS punches consumed from the queue (acked only on success)
 
     try:
@@ -150,18 +154,36 @@ def _sync_device(device: store.Device) -> store.LogEntry:
                     skipped += 1
                     continue
 
-                client.create_checkin(
-                    employee=employee,
-                    timestamp=ts,
-                    log_type=log_type,
-                    device_id=str(device.device_id),
-                    latitude=device.latitude,
-                    longitude=device.longitude,
-                )
+                # One rejected punch must not block every later one
+                try:
+                    client.create_checkin(
+                        employee=employee,
+                        timestamp=ts,
+                        log_type=log_type,
+                        device_id=str(device.device_id),
+                        latitude=device.latitude,
+                        longitude=device.longitude,
+                    )
+                except requests.HTTPError as e:
+                    if e.response is None or e.response.status_code in (401, 403) \
+                            or e.response.status_code >= 500:
+                        raise  # credentials / server down: every record would fail
+                    failed += 1
+                    logger.warning(f"Checkin rejected for {employee} (device user {uid}) at {ts}: {e}")
+                    if len(errors) < 3:
+                        errors.append(f"{employee} @ {ts}: {e}")
+                    continue
                 pushed += 1
 
-            status = "Success"
             message = f"Pulled {pulled}, pushed {pushed}, skipped {skipped} (no mapping or duplicate)."
+            if failed:
+                # Not "Success": keeps ADMS punches queued so rejected ones are retried
+                status = "Failed"
+                message += f" {failed} rejected by ERPNext — " + "; ".join(errors)
+                if failed > len(errors):
+                    message += f" (+{failed - len(errors)} more, see biometric_sync.log)"
+            else:
+                status = "Success"
 
             # Update last_sync_of_checkin on all linked shift types
             if pushed > 0:
