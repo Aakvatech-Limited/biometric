@@ -21,7 +21,9 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-TOKEN_ENDPOINT = "/api-token-auth/"
+# BioTime exposes two login endpoints: the JWT one (header "JWT <token>") and
+# the plain DRF one (header "Token <token>"). Try JWT first, fall back on 404.
+TOKEN_ENDPOINTS = (("/jwt-api-token-auth/", "JWT"), ("/api-token-auth/", "Token"))
 TRANSACTIONS_ENDPOINT = "/iclock/api/transactions/"
 
 # BioTime punch_state codes (matches ZKTeco's standard convention).
@@ -54,20 +56,42 @@ def _friendly_error(e: Exception) -> str:
         status = e.response.status_code if e.response is not None else "?"
         if status in (401, 403):
             return "BioTime rejected the credentials (401/403). Check username/password."
-        return f"BioTime returned HTTP {status}."
+        detail = _error_detail(e.response)
+        if status == 400 and e.request is not None and "token-auth" in (e.request.url or ""):
+            return f"BioTime login failed: {detail or 'check username/password'}"
+        return f"BioTime returned HTTP {status}." + (f" {detail}" if detail else "")
     return str(e)
 
 
+def _error_detail(resp) -> str:
+    """Pull BioTime's own error text out of a DRF error body, if there is one."""
+    if resp is None:
+        return ""
+    try:
+        body = resp.json()
+    except ValueError:
+        return resp.text[:200].strip()
+    if isinstance(body, dict):
+        parts = []
+        for value in body.values():
+            parts.extend(value if isinstance(value, list) else [value])
+        return " ".join(str(p) for p in parts)
+    return str(body)[:200]
+
+
 def _authenticate(base_url: str, username: str, password: str, timeout: int = 15) -> str:
-    """POST credentials to BioTime's token endpoint, return the auth token."""
-    url = f"{base_url.rstrip('/')}{TOKEN_ENDPOINT}"
-    resp = requests.post(url, data={"username": username, "password": password}, timeout=timeout)
-    resp.raise_for_status()
-    data = resp.json()
-    token = data.get("token")
-    if not token:
-        raise RuntimeError("BioTime did not return an auth token.")
-    return token
+    """POST credentials to BioTime's token endpoint, return the Authorization header value."""
+    for endpoint, scheme in TOKEN_ENDPOINTS:
+        url = f"{base_url.rstrip('/')}{endpoint}"
+        resp = requests.post(url, data={"username": username, "password": password}, timeout=timeout)
+        if resp.status_code == 404:
+            continue
+        resp.raise_for_status()
+        token = resp.json().get("token")
+        if not token:
+            raise RuntimeError("BioTime did not return an auth token.")
+        return f"{scheme} {token}"
+    raise RuntimeError("BioTime has no token login endpoint at this URL — check the BioTime URL.")
 
 
 def _parse_timestamp(value: str):
@@ -91,8 +115,7 @@ def pull_transactions(base_url: str, username: str, password: str,
         Exception on connection, auth, or read failure.
     """
     try:
-        token = _authenticate(base_url, username, password, timeout=timeout)
-        headers = {"Authorization": f"JWT {token}"}
+        headers = {"Authorization": _authenticate(base_url, username, password, timeout=timeout)}
 
         params = {"page_size": 200}
         if terminal_sn:
@@ -107,8 +130,7 @@ def pull_transactions(base_url: str, username: str, password: str,
             resp = requests.get(url, headers=headers, params=params, timeout=timeout)
             if resp.status_code == 401:
                 # Token may have expired mid-run — re-authenticate once and retry.
-                token = _authenticate(base_url, username, password, timeout=timeout)
-                headers = {"Authorization": f"JWT {token}"}
+                headers = {"Authorization": _authenticate(base_url, username, password, timeout=timeout)}
                 resp = requests.get(url, headers=headers, params=params, timeout=timeout)
             resp.raise_for_status()
             payload = resp.json()

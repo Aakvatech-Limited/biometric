@@ -1,179 +1,33 @@
 {% extends "base.html" %}
-{% block title %}Devices — Biometric Sync{% endblock %}
-{% block live_refresh %}1{% endblock %}
-
-{% block content %}
-<div class="page-header d-flex align-items-start justify-content-between">
-  <div>
-    <h1><i class="bi bi-hdd-network me-2" style="color:var(--accent)"></i>Devices</h1>
-    <p>Manage ZKTeco biometric devices connected to this server.</p>
-  </div>
-  <a href="{{ url_for('devices.new') }}" class="btn btn-primary btn-sm">
-    <i class="bi bi-plus-lg me-1"></i>Add Device
-  </a>
-</div>
-
-{% for sn, seen, ip in unknown_devices %}
-<div class="alert alert-warning py-2 mb-3" style="font-size:0.85rem">
-  <i class="bi bi-exclamation-triangle me-1"></i>
-  A device with serial number <code>{{ sn }}</code> ({{ ip }}) is pushing to this app but isn't
-  registered, so its punches are held on the device until you add it. Last contact {{ seen.strftime('%H:%M:%S') }}.
-  Add a device with Terminal SN <code>{{ sn }}</code>{% if attendance_source != 'adms' %} and set the
-  Attendance Source to Push (ADMS) in Settings{% endif %}.
-</div>
-{% endfor %}
-
-<div class="card">
-  <div class="table-responsive">
-    <table class="table table-hover mb-0 card-table">
-      <thead>
-        <tr>
-          <th>Device Name</th>
-          <th>Device ID</th>
-          <th>{{ 'Terminal SN' if attendance_source in ('biotime', 'adms') else 'IP : Port' }}</th>
-          <th>Direction</th>
-          <th>Active</th>
-          <th>Last Synced</th>
-          <th>Status</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for device in devices %}
-        <tr>
-          <td data-label="Device">
-            <span class="status-dot {% if device.is_active %}online{% else %}offline{% endif %} me-1"></span>
-            <strong>{{ device.name }}</strong>
-          </td>
-          <td data-label="Device ID">
-            <span class="badge badge-muted-soft">{{ device.device_id }}</span>
-          </td>
-          <td data-label="{{ 'Terminal SN' if attendance_source in ('biotime', 'adms') else 'IP : Port' }}">
-            {% if attendance_source in ('biotime', 'adms') %}
-              <code style="color:#79c0ff">{{ device.terminal_sn or '—' }}</code>
-            {% else %}
-              <code style="color:#79c0ff">{{ device.ip_address }}:{{ device.port }}</code>
-            {% endif %}
-          </td>
-          <td data-label="Direction">
-            <span class="badge badge-muted-soft">{{ device.punch_direction }}</span>
-          </td>
-          <td data-label="Active">
-            {% if device.is_active %}
-              <span class="badge badge-success-soft">Yes</span>
-            {% else %}
-              <span class="badge badge-muted-soft">No</span>
-            {% endif %}
-          </td>
-          <td data-label="Last Synced" style="font-size:0.8rem; color:#8b949e">
-            {% if device.last_synced_at %}<span data-utc-datetime="{{ device.last_synced_at.isoformat() }}Z" data-include-year="true">{{ device.last_synced_at.strftime('%d %b %Y %H:%M') }} UTC</span>{% else %}—{% endif %}
-          </td>
-          <td data-label="Status">
-            {% set status = device.last_sync_status %}
-            {% if status == 'Success' %}
-              <span class="badge badge-success-soft">Success</span>
-            {% elif status == 'Failed' %}
-              <span class="badge badge-danger-soft">Failed</span>
-            {% elif status == 'No Data' %}
-              <span class="badge badge-warning-soft">No Data</span>
-            {% else %}
-              <span class="badge badge-muted-soft">Never</span>
-            {% endif %}
-          </td>
-          <td class="td-actions">
-            <div class="d-flex gap-1 flex-wrap">
-              <button class="btn-sync" id="syncBtn-{{ device.id }}" data-sync-device-id="{{ device.id }}"
-                onclick="syncDevice({{ device.id }}, '{{ device.name }}')" title="Sync">
-                <i class="bi bi-arrow-repeat"></i>
-              </button>
-              <button class="btn btn-sm btn-outline-secondary"
-                onclick="testDevice({{ device.id }}, '{{ device.name }}')" title="Test connection">
-                <i class="bi bi-wifi"></i>
-              </button>
-              <a href="{{ url_for('devices.logs', device_id=device.id) }}"
-                class="btn btn-sm btn-outline-secondary" title="View logs">
-                <i class="bi bi-journal-text"></i>
-              </a>
-              <a href="{{ url_for('devices.edit', device_id=device.id) }}"
-                class="btn btn-sm btn-outline-secondary" title="Edit">
-                <i class="bi bi-pencil"></i>
-              </a>
-              <form method="POST" action="{{ url_for('devices.delete', device_id=device.id) }}"
-                onsubmit="return confirm('Delete {{ device.name }}?')">
-                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
-                  <i class="bi bi-trash"></i>
-                </button>
-              </form>
-            </div>
-          </td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="8" class="text-center py-5" style="color:#8b949e">
-            <i class="bi bi-hdd-network" style="font-size:2rem; display:block; margin-bottom:0.5rem"></i>
-            No devices configured yet.
-            <a href="{{ url_for('devices.new') }}" class="d-block mt-1">Add your first device →</a>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<div class="toast-container position-fixed bottom-0 end-0 p-3">
-  <div id="syncToast" class="toast">
-    <div class="toast-header">
-      <i class="bi bi-fingerprint me-2" style="color:var(--accent)"></i>
-      <strong class="me-auto">Result</strong>
-      <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
-    </div>
-    <div class="toast-body" id="toastBody"></div>
-  </div>
-</div>
+{% set nav = "devices" %}
+{% block title %}Devices{% endblock %}
+{% block actions %}
+<a class="btn solid" href="{{ url_for('pages.new_device') }}">{{ ui.icon("plus") }}<span class="label">Add device</span></a>
 {% endblock %}
+{% block content %}
+<div class="page-body w-7xl stack" data-live>
+  {% for u in unknown %}
+  <div class="alert amber">
+    <div class="alert-title">{{ ui.icon("triangle-alert") }} Unregistered device {{ u.terminal_sn }} is pushing punches</div>
+    <p class="alert-text">From {{ u.ip }}, last contact {{ ui.time(u.last_seen, "abs") }}. Its punches are held on the device until you add it with Terminal SN {{ u.terminal_sn }}{% if source != "adms" %} and set the attendance source to Push (ADMS) in Settings{% endif %}.</p>
+    <a class="btn" href="{{ url_for('pages.new_device', terminal_sn=u.terminal_sn) }}">Add device</a>
+  </div>
+  {% endfor %}
 
-{% block scripts %}
-<script>
-function showToast(msg, ok) {
-  const t = document.getElementById('syncToast');
-  document.getElementById('toastBody').textContent = msg;
-  t.className = `toast text-white ${ok ? 'bg-success' : 'bg-danger'}`;
-  new bootstrap.Toast(t, { delay: 4000 }).show();
-}
+  <div class="with-aside">
+    {% call ui.card("Registered devices", source_description, flush=True) %}
+      {{ ui.device_list(devices) }}
+    {% endcall %}
 
-async function syncDevice(id, name) {
-  window.syncBusy = true;
-  const btn = document.getElementById(`syncBtn-${id}`);
-  btn.disabled = true;
-  btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
-  try {
-    const res = await fetch(`/api/sync/${id}`, { method: 'POST' });
-    const data = await res.json();
-    if (data.success) {
-      const l = data.log;
-      showToast(`${name}: Pulled ${l.records_pulled}, Pushed ${l.records_pushed}`, true);
-    } else {
-      showToast(`${name}: ${data.error || data.log?.message || 'Failed'}`, false);
-    }
-  } catch (error) {
-    showToast(`${name}: Network error`, false);
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-arrow-repeat"></i>';
-    setTimeout(() => location.reload(), 2000);
-  }
-}
-
-async function testDevice(id, name) {
-  showToast(`Testing ${name}…`, true);
-  const res = await fetch(`/api/test-device/${id}`, { method: 'POST' });
-  const data = await res.json();
-  if (data.success) {
-    showToast(`${name}: Connected! SN: ${data.device_info?.serialnumber || 'N/A'}`, true);
-  } else {
-    showToast(`${name}: ${data.message}`, false);
-  }
-}
-</script>
+    {% call ui.help("Adding a device") %}
+      <ol>{% for step in steps %}<li>{{ step | safe }}</li>{% endfor %}</ol>
+      <h3 class="sub">Good to know</h3>
+      <ul>
+        <li>Inactive devices are skipped by <b>Sync all</b> and auto sync.</li>
+        <li>A punch already in ERPNext is never sent twice, so syncing again is safe.</li>
+        <li>The attendance source is set in <a class="link" style="text-decoration:underline" href="{{ url_for('pages.settings') }}">Settings</a>.</li>
+      </ul>
+    {% endcall %}
+  </div>
+</div>
 {% endblock %}

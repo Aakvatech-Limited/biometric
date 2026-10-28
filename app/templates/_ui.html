@@ -1,0 +1,219 @@
+{# Shared building blocks for the pages. Import with:
+   {% import "_ui.html" as ui %} #}
+
+{% macro icon(name, cls="") -%}
+<svg class="icon {{ cls }}" aria-hidden="true"><use href="{{ url_for('static', filename='icons.svg') }}#{{ name }}"/></svg>
+{%- endmacro %}
+
+{# A timestamp the browser shows in the viewer's time zone (app.js fills it in).
+   fmt: "rel" (4 min ago), "abs" (Oct 28, 11:55:32), "short" (Oct 28, 11:55) or "full" (with year). #}
+{% macro time(iso, fmt="rel", empty="—") -%}
+{% if iso %}<time datetime="{{ iso }}" data-fmt="{{ fmt }}">{{ iso[:16] | replace("T", " ") }}</time>{% else %}{{ empty }}{% endif %}
+{%- endmacro %}
+
+{% macro badge(label, theme="gray", cls="") -%}
+<span class="badge {{ theme }} {{ cls }}">{{ label }}</span>
+{%- endmacro %}
+
+{% macro status_badge(status) -%}
+{{ badge(status or "Never", {"Success": "green", "Failed": "red", "No Data": "amber"}.get(status, "gray")) }}
+{%- endmacro %}
+
+{% macro num(value) -%}{{ "{:,}".format(value or 0) }}{%- endmacro %}
+
+{# A titled section. Use with {% call ui.card(...) %}body{% endcall %}. #}
+{% macro card(title, description=None, flush=False, actions=None) -%}
+<section class="card">
+  <div class="card-head">
+    <div style="min-width:0">
+      <h2 class="card-title">{{ title }}</h2>
+      {% if description %}<p class="card-desc">{{ description }}</p>{% endif %}
+    </div>
+    {% if actions %}<div class="row">{{ actions }}</div>{% endif %}
+  </div>
+  <div class="card-body{{ ' flush' if flush }}">{{ caller() }}</div>
+</section>
+{%- endmacro %}
+
+{% macro help(title, icon_name="info") -%}
+<aside class="help">
+  <h3>{{ icon(icon_name) }} {{ title }}</h3>
+  {{ caller() }}
+</aside>
+{%- endmacro %}
+
+{# A device's last syncs as a row of bars, oldest on the left. #}
+{% macro strip(recent) -%}
+{% set failed = recent | selectattr("status", "equalto", "Failed") | list | length %}
+{% set summary = ("Last " ~ (recent | length) ~ " syncs: " ~ (recent | length - failed) ~ " ok, " ~ failed ~ " failed") if recent else "No syncs yet" %}
+<div class="strip" role="img" aria-label="{{ summary }}" title="{{ summary }}">
+  {% for _ in range(10 - recent | length) %}<span></span>{% endfor %}
+  {% for bar in recent %}<span class="{{ {'Failed': 'fail', 'No Data': 'nodata'}.get(bar.status, 'ok') }}"></span>{% endfor %}
+</div>
+{%- endmacro %}
+
+{% macro syncing() -%}
+<span class="syncing">{{ icon("loader-circle", "icon-sm spin") }} Syncing…</span>
+{%- endmacro %}
+
+{# The device list. `compact` (dashboard) drops search, filters and the ⋯ menu. #}
+{% macro device_list(devices, compact=False) -%}
+{% set attention = devices | selectattr("is_active") | selectattr("last_sync_status", "equalto", "Failed") | list %}
+{% set inactive = devices | rejectattr("is_active") | list %}
+<div class="devices{{ ' compact' if compact }}" data-filter-group="devices">
+  {% if not devices %}
+    <div class="empty">
+      {{ icon("fingerprint") }}
+      <p class="empty-title">No devices yet</p>
+      <p style="margin-top:4px">Add a device to start sending its punches to ERPNext.</p>
+      <a class="btn solid" href="{{ url_for('pages.new_device') }}" style="margin-top:16px">{{ icon("plus") }} Add device</a>
+    </div>
+  {% else %}
+    {% if not compact %}
+    <div class="toolbar">
+      <div class="input-wrap" style="width:16rem">
+        {{ icon("search") }}
+        <input class="input pad-left" type="search" placeholder="Search name or address" aria-label="Search devices" data-filter-search>
+      </div>
+      <div class="tabs push" role="group" aria-label="Filter devices">
+        <button type="button" class="tab" data-filter-tab="all" aria-pressed="true">All {{ devices | length }}</button>
+        <button type="button" class="tab" data-filter-tab="attention" aria-pressed="false">Needs attention {{ attention | length }}</button>
+        <button type="button" class="tab" data-filter-tab="inactive" aria-pressed="false">Inactive {{ inactive | length }}</button>
+      </div>
+    </div>
+    {% endif %}
+    <div class="list-head wide-only">
+      <div>Device</div><div>Recent syncs</div><div>Last sync</div><div>Last result</div><div></div>
+    </div>
+    {% for d in devices %}
+    <div class="list-row" data-row
+         data-search="{{ d.name | lower }} {{ d.ip_address | lower }} {{ d.terminal_sn | lower }}"
+         data-tags="{{ 'attention' if d.is_active and d.last_sync_status == 'Failed' }} {{ 'inactive' if not d.is_active }}">
+      <div class="cell">
+        <span class="device-icon{{ ' off' if not d.is_active }}">{{ icon("fingerprint", "icon-lg") }}</span>
+        <div style="min-width:0">
+          <div class="row" style="flex-wrap:nowrap">
+            <span class="device-name truncate{{ ' off' if not d.is_active }}">{{ d.name }}</span>
+            {% if not d.is_active %}{{ badge("Inactive") }}{% endif %}
+          </div>
+          <div class="row text-sm muted" style="gap:0 12px">
+            <span class="tnum" style="overflow-wrap:anywhere">{{ d.address }}</span>
+            <span class="wide-only" style="flex-shrink:0">ID {{ d.device_id }}</span>
+            {% if d.punch_direction != "AUTO" %}<span class="wide-only" style="flex-shrink:0">{{ "In only" if d.punch_direction == "IN" else "Out only" }}</span>{% endif %}
+          </div>
+          <div class="row narrow-only" style="margin-top:4px;gap:12px">
+            {{ strip(d.recent) }}
+            {% if d.syncing %}{{ syncing() }}{% else %}<span class="text-sm muted">{{ time(d.last_synced_at, empty="Never") }}</span>{% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="cell wide-only">{{ strip(d.recent) }}</div>
+      <div class="cell wide-only">
+        {% if d.syncing %}{{ syncing() }}
+        {% elif not d.last_synced_at %}<span class="text-sm faint">Never</span>
+        {% else %}
+        <div style="min-width:0">
+          {{ status_badge(d.last_sync_status) }}
+          <div class="text-sm muted" style="margin-top:4px">{{ time(d.last_synced_at) }}</div>
+        </div>
+        {% endif %}
+      </div>
+      <div class="cell wide-only">
+        {% if d.last_result %}
+        <div style="min-width:0">
+          <div class="text-sm tnum {{ d.last_result.tone }}" style="font-weight:500">{{ d.last_result.main }}</div>
+          {% if d.last_result.sub %}<div class="truncate text-sm muted">{{ d.last_result.sub }}</div>{% endif %}
+        </div>
+        {% else %}<span class="text-sm faint">—</span>{% endif %}
+      </div>
+      <div class="cell end">
+        <button type="button" class="btn" data-action="sync" data-id="{{ d.id }}" data-name="{{ d.name }}" {{ "disabled" if d.syncing }} title="Sync">
+          {{ icon("refresh-cw", "spin" if d.syncing else "") }}<span class="wide-only">{{ "Syncing" if d.syncing else "Sync" }}</span>
+        </button>
+        <a class="btn ghost icon-only" href="{{ url_for('pages.device_logs', device_id=d.id) }}" title="Sync history" aria-label="Sync history">{{ icon("scroll-text") }}</a>
+        {% if not compact %}
+        <div class="menu-wrap">
+          <button type="button" class="btn ghost icon-only" data-menu aria-label="More actions" title="More actions" aria-expanded="false">{{ icon("ellipsis") }}</button>
+          <div class="menu" hidden>
+            <button type="button" class="menu-item" data-action="test" data-id="{{ d.id }}" data-name="{{ d.name }}">{{ icon("wifi") }} Test connection</button>
+            <a class="menu-item" href="{{ url_for('pages.edit_device', device_id=d.id) }}">{{ icon("pencil") }} Edit</a>
+            <button type="button" class="menu-item red" data-action="delete" data-id="{{ d.id }}" data-name="{{ d.name }}"
+                    data-what="The device is removed from this app.">{{ icon("trash-2") }} Delete</button>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    <div class="empty" data-no-match hidden style="padding:40px 16px">
+      No devices match these filters. <button type="button" class="btn ghost" data-filter-clear>Clear filters</button>
+    </div>
+  {% endif %}
+</div>
+{%- endmacro %}
+
+{# Sync history rows. #}
+{% macro log_list(logs, show_device=False, empty_text="No syncs yet. They appear here as soon as a device syncs.") -%}
+{% set failed = logs | selectattr("status", "equalto", "Failed") | list | length %}
+{% set device_names = logs | map(attribute="device_name") | unique | list %}
+<div class="logs{{ ' with-device' if show_device }}" data-filter-group="logs">
+  {% if not logs %}
+    <div class="empty">{{ icon("scroll-text") }}{{ empty_text }}</div>
+  {% else %}
+    <div class="toolbar">
+      <div class="tabs" role="group" aria-label="Filter syncs">
+        <button type="button" class="tab" data-filter-tab="all" aria-pressed="true">All {{ logs | length }}</button>
+        <button type="button" class="tab" data-filter-tab="failed" aria-pressed="false">Failed {{ failed }}</button>
+      </div>
+      {% if show_device and device_names | length > 1 %}
+      <select class="input push" style="width:11rem" data-filter-device aria-label="Filter by device">
+        <option value="">All devices</option>
+        {% for name in device_names %}<option>{{ name }}</option>{% endfor %}
+      </select>
+      {% endif %}
+    </div>
+    <div class="list-head wide-only">
+      <div>When</div>{% if show_device %}<div>Device</div>{% endif %}<div>Result</div>
+      <div class="num" title="Punches read from the device">Read</div>
+      <div class="num" title="Check-ins sent to ERPNext">Sent</div>
+      <div class="num" title="Already in ERPNext, or no employee for that user">Skipped</div>
+      <div style="padding-left:20px">What happened</div>
+    </div>
+    {% for log in logs %}
+    <div class="list-row" data-row data-tags="{{ 'failed' if log.status == 'Failed' }}" data-device="{{ log.device_name }}">
+      <div class="cell">
+        <div class="text-sm" style="color:var(--ink-gray-8)">
+          {% if show_device %}<span class="narrow-only" style="display:inline;font-weight:500;margin-right:8px">{{ log.device_name }}</span>{% endif %}
+          {{ time(log.synced_at) }}
+        </div>
+        <div class="text-xs muted tnum wide-only">{{ time(log.synced_at, "abs") }}</div>
+        <div class="row narrow-only text-sm muted tnum" style="gap:0 12px">
+          <span>{{ num(log.records_pulled) }} read</span><span>{{ num(log.records_pushed) }} sent</span><span>{{ num(log.records_skipped) }} skipped</span>
+        </div>
+        {% if log.shown_message %}<div class="narrow-only" style="display:block;width:100%">{{ outcome(log) }}</div>{% endif %}
+      </div>
+      <div class="cell narrow-only" style="align-items:flex-end">{{ status_badge(log.status) }}</div>
+      {% if show_device %}<div class="cell wide-only text-sm"><span class="truncate">{{ log.device_name }}</span></div>{% endif %}
+      <div class="cell wide-only">{{ status_badge(log.status) }}</div>
+      {% for key in ["records_pulled", "records_pushed", "records_skipped"] %}
+      <div class="cell wide-only num text-sm tnum {{ '' if log[key] else 'faint' }}">{{ num(log[key]) }}</div>
+      {% endfor %}
+      <div class="cell wide-only" style="padding-left:20px">{% if log.shown_message %}{{ outcome(log) }}{% else %}<span class="text-sm faint">—</span>{% endif %}</div>
+    </div>
+    {% endfor %}
+    <div class="empty" data-no-match hidden style="padding:40px 16px">No syncs match this filter.</div>
+  {% endif %}
+</div>
+{%- endmacro %}
+
+{# A sync's message: a plain explanation with the raw text behind Details, or the raw text. #}
+{% macro outcome(log) -%}
+{% if log.explained %}
+  <div style="width:100%">
+    <div class="what"><p>{{ log.explained }}</p><button type="button" class="btn ghost sm" data-details aria-expanded="false">Details</button></div>
+    <p class="details" hidden>{{ log.shown_message }}</p>
+  </div>
+{% else %}
+  <button type="button" class="raw-error" data-raw-error title="Show the full message">{{ log.shown_message }}</button>
+{% endif %}
+{%- endmacro %}

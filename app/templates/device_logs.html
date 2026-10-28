@@ -1,56 +1,33 @@
 {% extends "base.html" %}
-{% block title %}Logs — {{ device.name }}{% endblock %}
-{% block live_refresh %}1{% endblock %}
-
+{% set nav = "devices" %}
+{% block title %}{{ device.name }} logs{% endblock %}
+{% block back %}<a class="btn ghost icon-only back" href="{{ url_for('pages.devices') }}" aria-label="Back to devices">{{ ui.icon("chevron-left") }}</a>{% endblock %}
+{% block actions %}
+<button type="button" class="btn" data-action="sync" data-id="{{ device.id }}" data-name="{{ device.name }}" {{ "disabled" if device.syncing }}>{{ ui.icon("refresh-cw") }}<span class="label">Sync</span></button>
+{% endblock %}
 {% block content %}
-<div class="page-header">
-  <a href="{{ url_for('devices.index') }}" style="color:#8b949e; font-size:0.8rem; text-decoration:none">
-    <i class="bi bi-arrow-left me-1"></i>Devices
-  </a>
-  <h1 class="mt-1"><i class="bi bi-journal-code me-2" style="color:var(--accent)"></i>{{ device.name }} — Sync Logs</h1>
-  <p>{{ device.ip_address }}:{{ device.port }} &middot; Last 50 records &middot; Times: <span data-local-timezone>local timezone</span> &middot; live refresh</p>
-</div>
+<div class="page-body w-7xl with-aside" data-live>
+  {% set history_desc %}The last 50 syncs since the app started. Times in <span data-tz>your time zone</span>, updates live.{% endset %}
+  {% call ui.card("Sync history", history_desc, flush=True) %}
+    {{ ui.log_list(logs, empty_text="No logs for this device yet.") }}
+  {% endcall %}
 
-<div class="card">
-  <div class="table-responsive">
-    <table class="table mb-0 card-table">
-      <thead>
-        <tr>
-          <th>Time</th>
-          <th>Status</th>
-          <th>Pulled</th>
-          <th>Pushed</th>
-          <th>Skipped</th>
-          <th>Message</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for log in logs %}
-        <tr>
-          <td data-label="Time" style="font-size:0.8rem; color:#8b949e; white-space:nowrap">
-            <span data-utc-datetime="{{ log.synced_at.isoformat() }}Z" data-include-year="true" data-include-seconds="true">{{ log.synced_at.strftime('%d %b %Y %H:%M:%S') }} UTC</span>
-          </td>
-          <td data-label="Status">
-            {% if log.status == 'Success' %}
-              <span class="badge badge-success-soft">Success</span>
-            {% elif log.status == 'Failed' %}
-              <span class="badge badge-danger-soft">Failed</span>
-            {% else %}
-              <span class="badge badge-warning-soft">{{ log.status }}</span>
-            {% endif %}
-          </td>
-          <td data-label="Pulled">{{ log.records_pulled }}</td>
-          <td data-label="Pushed">{{ log.records_pushed }}</td>
-          <td data-label="Skipped">{{ log.records_skipped }}</td>
-          <td data-label="Message" style="font-size:0.8rem; color:#8b949e">{{ log.message or '—' }}</td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="6" class="text-center py-5" style="color:#8b949e">No logs for this device yet.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  {% call ui.help("Device", "server") %}
+    {% if device.syncing %}<div style="margin-bottom:12px">{{ ui.syncing() }}</div>{% endif %}
+    <dl>
+      {% if device.terminal_sn %}
+      <div><dt>Terminal SN</dt><dd style="font-weight:420">{{ device.terminal_sn }}</dd></div>
+      {% else %}
+      <div><dt>Address</dt><dd style="font-weight:420">{{ device.ip_address }}:{{ device.port }}</dd></div>
+      {% endif %}
+      <div><dt>Device ID</dt><dd style="font-weight:420">{{ device.device_id }}</dd></div>
+      <div><dt>Punch direction</dt><dd style="font-weight:420">{{ device.punch_direction }}</dd></div>
+      <div><dt>Active</dt><dd style="font-weight:420">{{ "Yes" if device.is_active else "No, skipped by Sync all" }}</dd></div>
+      <div><dt>Shift types</dt><dd style="font-weight:420">{{ device.shift_types | join(", ") or "—" }}</dd></div>
+      <div><dt>Last synced</dt><dd style="font-weight:420">{{ ui.time(device.last_synced_at, "full") }}</dd></div>
+    </dl>
+    <a class="btn" style="margin-top:16px" href="{{ url_for('pages.edit_device', device_id=device.id) }}">{{ ui.icon("pencil") }} Edit device</a>
+    <p class="text-xs muted" style="margin-top:16px">History is kept in memory and clears when the app restarts. The full record is in <code>biometric_sync.log</code>.</p>
+  {% endcall %}
 </div>
 {% endblock %}

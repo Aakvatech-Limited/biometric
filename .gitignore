@@ -15,3 +15,6 @@ adms_queue.json.tmp
 # logs
 *.log
 logs/
+
+# raw requests from unknown FK/BioMax devices, saved by app/routes/fkweb.py
+captures/

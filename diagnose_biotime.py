@@ -16,23 +16,23 @@ import sys
 
 import requests
 
-from app.services.biotime_service import TOKEN_ENDPOINT, TRANSACTIONS_ENDPOINT, _authenticate
+from app.services.biotime_service import TRANSACTIONS_ENDPOINT, _authenticate, _friendly_error
 
 
 def main(base_url, username, password):
-    print(f"\n--- Authenticating against {base_url}{TOKEN_ENDPOINT} ---")
+    print(f"\n--- Authenticating against {base_url} ---")
     try:
-        token = _authenticate(base_url, username, password)
-        print(f"AUTH: OK — token: {token[:12]}...")
+        auth_header = _authenticate(base_url, username, password)
+        print(f"AUTH: OK — {auth_header[:16]}...")
     except Exception as e:
-        print(f"AUTH: FAILED — {type(e).__name__}: {e}")
+        print(f"AUTH: FAILED — {type(e).__name__}: {_friendly_error(e)}")
         return
 
     print(f"\n--- Fetching one page from {base_url}{TRANSACTIONS_ENDPOINT} ---")
     try:
         resp = requests.get(
             f"{base_url.rstrip('/')}{TRANSACTIONS_ENDPOINT}",
-            headers={"Authorization": f"JWT {token}"},
+            headers={"Authorization": auth_header},
             params={"page_size": 5},
             timeout=15,
         )
