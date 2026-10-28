@@ -1,129 +1,107 @@
 {% extends "base.html" %}
-{% block title %}{{ 'Edit' if device else 'Add' }} Device — Biometric Sync{% endblock %}
-
+{% set nav = "devices" %}
+{% set serial = source in ("biotime", "adms") %}
+{% block title %}{{ "Edit device" if device else "Add device" }}{% endblock %}
+{% block back %}<a class="btn ghost icon-only back" href="{{ url_for('pages.devices') }}" aria-label="Back to devices">{{ ui.icon("chevron-left") }}</a>{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h1>
-    <i class="bi bi-hdd-network me-2" style="color:var(--accent)"></i>
-    {{ 'Edit Device' if device else 'Add Device' }}
-  </h1>
-  <p>{{ 'Update device details.' if device else 'Register a new ZKTeco biometric device.' }}</p>
-</div>
+<div class="page-body w-5xl with-aside at-lg">
+  {% call ui.card("Device details",
+                  "Changes apply from the next sync." if device else "Register a biometric device whose punches should reach ERPNext.") %}
+  <form class="stack" style="--gap:20px" data-device-form data-id="{{ device.id if device else '' }}" novalidate>
+    <label class="field">
+      <span class="field-label">Device name <span class="req">*</span></span>
+      <input class="input" name="name" required placeholder="e.g. Main Gate" value="{{ device.name if device else '' }}">
+    </label>
 
-<div class="row">
-  <div class="col-12 col-md-7 col-lg-5">
-    <div class="card">
-      <div class="card-header">Device Details</div>
-      <div class="card-body p-4">
-        <form method="POST">
-          <div class="mb-3">
-            <label class="form-label text-muted" style="font-size:0.8rem">Device Name</label>
-            <input type="text" name="name" class="form-control"
-              placeholder="e.g. Main Gate" required
-              value="{{ device.name if device else '' }}">
-          </div>
-          {% if attendance_source in ('biotime', 'adms') %}
-          <div class="mb-3">
-            <label class="form-label text-muted" style="font-size:0.8rem">Device ID</label>
-            <input type="number" name="device_id" class="form-control"
-              placeholder="1" min="1"
-              value="{{ device.device_id if device else 1 }}">
-            <div class="form-text" style="font-size:0.75rem">Tag sent to ERPNext with each Checkin.</div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label text-muted" style="font-size:0.8rem">Terminal Serial Number</label>
-            <input type="text" name="terminal_sn" class="form-control"
-              placeholder="e.g. CMK8213960" required
-              value="{{ device.terminal_sn if device else '' }}">
-            <div class="form-text" style="font-size:0.75rem">
-              {% if attendance_source == 'adms' %}
-              The device's serial number (Menu → System Info → Device Info → Serial Number).
-              {% else %}
-              The serial number this terminal is registered under in BioTime.
-              {% endif %}
-            </div>
-          </div>
-          {% else %}
-          <div class="row g-3 mb-3">
-            <div class="col">
-              <label class="form-label text-muted" style="font-size:0.8rem">Device ID</label>
-              <input type="number" name="device_id" class="form-control"
-                placeholder="1" min="1"
-                value="{{ device.device_id if device else 1 }}">
-              <div class="form-text" style="font-size:0.75rem">Physical device serial number</div>
-            </div>
-            <div class="col">
-              <label class="form-label text-muted" style="font-size:0.8rem">Port</label>
-              <input type="number" name="port" class="form-control"
-                placeholder="4370"
-                value="{{ device.port if device else 4370 }}">
-            </div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label text-muted" style="font-size:0.8rem">IP Address</label>
-            <input type="text" name="ip_address" class="form-control"
-              placeholder="192.168.1.100" required
-              value="{{ device.ip_address if device else '' }}">
-          </div>
-          {% endif %}
-          <div class="row g-3 mb-3">
-            <div class="col">
-              <label class="form-label text-muted" style="font-size:0.8rem">Latitude</label>
-              <input type="number" step="any" min="-90" max="90" name="latitude" class="form-control"
-                placeholder="-6.7924"
-                value="{{ device.latitude if device and device.latitude is not none else request.form.get('latitude', '') }}">
-            </div>
-            <div class="col">
-              <label class="form-label text-muted" style="font-size:0.8rem">Longitude</label>
-              <input type="number" step="any" min="-180" max="180" name="longitude" class="form-control"
-                placeholder="39.2083"
-                value="{{ device.longitude if device and device.longitude is not none else request.form.get('longitude', '') }}">
-            </div>
-            <div class="form-text" style="font-size:0.75rem">
-              Optional fixed location of this biometric terminal. Leave blank if unknown.
-            </div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label text-muted" style="font-size:0.8rem">Punch Direction</label>
-            <select name="punch_direction" class="form-select">
-              {% for opt in ['AUTO', 'IN', 'OUT'] %}
-              <option value="{{ opt }}" {% if device and device.punch_direction == opt %}selected{% elif not device and opt == 'AUTO' %}selected{% endif %}>
-                {{ opt }}
-              </option>
-              {% endfor %}
-            </select>
-            <div class="form-text" style="font-size:0.75rem">
-              AUTO uses punch value from device. IN/OUT overrides all records.
-            </div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label text-muted" style="font-size:0.8rem">Shift Types</label>
-            <input type="text" name="shift_types" class="form-control"
-              placeholder="e.g. Morning Shift, Night Shift"
-              value="{{ selected_shift_types | join(', ') }}">
-            <div class="form-text" style="font-size:0.75rem">
-              Separate multiple shift types with a comma.
-              After sync, <code>last_sync_of_checkin</code> will be updated on each.
-            </div>
-          </div>
-          <div class="mb-4">
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" name="is_active" id="isActive"
-                {% if not device or device.is_active %}checked{% endif %}>
-              <label class="form-check-label" for="isActive" style="font-size:0.875rem">
-                Active (include in auto sync)
-              </label>
-            </div>
-          </div>
-          <div class="d-flex gap-2">
-            <button type="submit" class="btn btn-primary btn-sm">
-              <i class="bi bi-check-lg me-1"></i>{{ 'Save Changes' if device else 'Add Device' }}
-            </button>
-            <a href="{{ url_for('devices.index') }}" class="btn btn-sm btn-outline-secondary">Cancel</a>
-          </div>
-        </form>
-      </div>
+    {% if serial %}
+    <label class="field">
+      <span class="field-label">Terminal serial number <span class="req">*</span></span>
+      <input class="input" name="terminal_sn" required placeholder="e.g. CMK8213960" value="{{ terminal_sn }}">
+      <span class="field-help">{{ "On the device: Menu → System Info → Device Info → Serial Number." if source == "adms" else "The serial number this terminal is registered under in BioTime." }}</span>
+    </label>
+    <label class="field">
+      <span class="field-label">Device ID</span>
+      <input class="input" name="device_id" type="number" min="1" value="{{ device.device_id if device else 1 }}">
+      <span class="field-help">Tag sent to ERPNext with each check-in.</span>
+    </label>
+    {% else %}
+    <label class="field">
+      <span class="field-label">IP address <span class="req">*</span></span>
+      <input class="input" name="ip_address" required placeholder="192.168.1.100" value="{{ device.ip_address if device else '' }}">
+    </label>
+    <div class="grid-2">
+      <label class="field">
+        <span class="field-label">Device ID</span>
+        <input class="input" name="device_id" type="number" min="1" value="{{ device.device_id if device else 1 }}">
+        <span class="field-help">Tag sent to ERPNext with each check-in.</span>
+      </label>
+      <label class="field">
+        <span class="field-label">Port</span>
+        <input class="input" name="port" type="number" placeholder="4370" value="{{ device.port if device else 4370 }}">
+      </label>
     </div>
-  </div>
+    {% endif %}
+
+    <div>
+      <div class="grid-2">
+        <label class="field">
+          <span class="field-label">Latitude</span>
+          <input class="input" name="latitude" type="number" step="any" min="-90" max="90" placeholder="-6.7924" value="{{ device.latitude if device and device.latitude is not none else '' }}">
+        </label>
+        <label class="field">
+          <span class="field-label">Longitude</span>
+          <input class="input" name="longitude" type="number" step="any" min="-180" max="180" placeholder="39.2083" value="{{ device.longitude if device and device.longitude is not none else '' }}">
+        </label>
+      </div>
+      <p class="field-help">Optional fixed location of this terminal. Leave blank if unknown.</p>
+    </div>
+
+    <label class="field">
+      <span class="field-label">Punch direction</span>
+      {% set direction = device.punch_direction if device else "AUTO" %}
+      <select class="input" name="punch_direction">
+        <option value="AUTO" {{ "selected" if direction == "AUTO" }}>AUTO — use the punch value from the device</option>
+        <option value="IN" {{ "selected" if direction == "IN" }}>IN — every punch is a check-in</option>
+        <option value="OUT" {{ "selected" if direction == "OUT" }}>OUT — every punch is a check-out</option>
+      </select>
+      <span class="field-help">AUTO uses the punch value from the device. IN or OUT overrides every record.</span>
+    </label>
+
+    {# Replaced by checkboxes when ERPNext lists its shift types (app.js). #}
+    <div class="field" data-shift-field data-selected="{{ (device.shift_types if device else []) | tojson | forceescape }}">
+      <span class="field-label">Shift types</span>
+      <input class="input" name="shift_types" placeholder="e.g. Morning Shift, Night Shift" value="{{ (device.shift_types if device else []) | join(', ') }}">
+      <span class="field-help" data-shift-help>Separate several with commas. After each sync, “Last Sync of Checkin” is updated on each.</span>
+    </div>
+
+    <label class="switch-row">
+      <span>
+        <span class="field-label">Active</span>
+        <span class="field-help">Include this device when syncing all devices.</span>
+      </span>
+      <input class="switch" type="checkbox" name="is_active" {{ "checked" if not device or device.is_active }}>
+    </label>
+
+    <p class="form-error" data-form-error hidden></p>
+
+    <div class="row">
+      <button type="submit" class="btn solid">{{ ui.icon("check") }} {{ "Save changes" if device else "Add device" }}</button>
+      <a class="btn" href="{{ url_for('pages.devices') }}">Cancel</a>
+    </div>
+  </form>
+  {% endcall %}
+
+  {% call ui.help("About these fields") %}
+    <dl>
+      {% if serial %}
+      <div><dt style="font-weight:500;color:var(--ink-gray-8)">Terminal serial number</dt><dd style="font-weight:420;color:inherit">{{ "Identifies the device when it pushes punches to this app." if source == "adms" else "Picks this terminal's punches out of BioTime." }}</dd></div>
+      {% else %}
+      <div><dt style="font-weight:500;color:var(--ink-gray-8)">IP address and port</dt><dd style="font-weight:420;color:inherit">Where this computer reaches the device on the network.</dd></div>
+      {% endif %}
+      <div><dt style="font-weight:500;color:var(--ink-gray-8)">Device ID</dt><dd style="font-weight:420;color:inherit">Saved on each Employee Checkin, so you can tell in ERPNext which device a punch came from.</dd></div>
+      <div><dt style="font-weight:500;color:var(--ink-gray-8)">Punch direction</dt><dd style="font-weight:420;color:inherit">Use IN or OUT for a door used only to enter or only to leave.</dd></div>
+      <div><dt style="font-weight:500;color:var(--ink-gray-8)">Shift types</dt><dd style="font-weight:420;color:inherit">Lets ERPNext know check-ins are up to date for these shifts.</dd></div>
+    </dl>
+  {% endcall %}
 </div>
 {% endblock %}

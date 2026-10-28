@@ -130,16 +130,16 @@ biometric/
 │   ├── store.py                 config.json persistence + in-memory logs
 │   ├── scheduler.py             APScheduler background job
 │   ├── routes/
-│   │   ├── dashboard.py         Main dashboard
-│   │   ├── devices.py           Device CRUD
-│   │   ├── settings.py          ERPNext settings
-│   │   └── api.py               JSON API (sync triggers)
+│   │   ├── pages.py             The web pages (dashboard, devices, settings)
+│   │   ├── ui_api.py            JSON actions the page buttons call (/api/ui/*)
+│   │   └── api.py               JSON API (sync triggers, service, updates)
 │   ├── services/
 │   │   ├── zk_service.py        pyzk device communication
 │   │   ├── erpnext_service.py   ERPNext REST API client
 │   │   ├── sync_engine.py       Orchestration logic
 │   │   └── updater.py           Git-based update checks + safe apply
-│   └── templates/               Jinja2 HTML templates
+│   ├── templates/               Jinja2 page templates (_ui.html holds shared pieces)
+│   └── static/                  frappe.css, app.js, icons.svg, font, favicon
 ├── config.py
 ├── run.py                       Auto-bootstrap launcher (venv + deps + start)
 ├── server.py                    Flask server entry point
@@ -148,6 +148,20 @@ biometric/
 ├── setup_windows.bat            One-click setup (Windows)
 └── requirements.txt
 ```
+
+## Web Interface
+
+The interface at `http://localhost:5050` looks like Frappe v16 but uses no
+framework and has no build step: Flask renders the pages from
+`app/templates`, styled by one stylesheet (`app/static/frappe.css`, which
+carries frappe-ui's colour tokens for light and dark mode) and made
+interactive by one small script (`app/static/app.js`). Icons are
+[Lucide](https://lucide.dev) symbols in `app/static/icons.svg`; the font is
+Inter, cut down to Latin characters.
+
+To change the interface, edit those files and reload the page. No Node.js,
+npm or build is ever needed. To add an icon, copy its `<path>` elements from
+lucide.dev into a new `<symbol id="name">` in `icons.svg`.
 
 ## Running in Production (background service)
 

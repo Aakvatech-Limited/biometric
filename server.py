@@ -10,6 +10,8 @@ background service (systemd / Task Scheduler).
 import logging
 import os
 
+from werkzeug.serving import WSGIRequestHandler
+
 from app import create_app
 from app.scheduler import start_scheduler
 
@@ -25,8 +27,24 @@ logging.basicConfig(
 if IS_BACKGROUND:
     logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
+
+class _RequestHandler(WSGIRequestHandler):
+    """Keeps headers with underscores in their names, which Werkzeug drops.
+
+    BioMax/FK devices send ``request_code``, ``dev_id``, ``trans_id`` that
+    way; they are exposed as ``environ["fk.<name>"]`` (see app/routes/fkweb.py).
+    """
+
+    def make_environ(self):
+        environ = super().make_environ()
+        for key, value in self.headers.items():
+            if "_" in key:
+                environ[f"fk.{key.lower()}"] = value
+        return environ
+
+
 app = create_app()
 
 if __name__ == "__main__":
     start_scheduler(app)
-    app.run(host="0.0.0.0", port=PORT, debug=False)
+    app.run(host="0.0.0.0", port=PORT, debug=False, request_handler=_RequestHandler)

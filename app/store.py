@@ -125,6 +125,7 @@ class Device:
             "terminal_sn": self.terminal_sn,
             "punch_direction": self.punch_direction,
             "is_active": self.is_active,
+            "shift_types": self.shift_types,
             "latitude": self.latitude,
             "longitude": self.longitude,
             "last_synced_at": self.last_synced_at.isoformat() if self.last_synced_at else None,
@@ -364,6 +365,8 @@ def log_counts() -> dict:
         return {
             "total": len(_logs),
             "failed": sum(1 for l in _logs if l.status == "Failed"),
+            "success": sum(1 for l in _logs if l.status == "Success"),
+            "pushed": sum(l.records_pushed for l in _logs if l.status == "Success"),
         }
 
 
